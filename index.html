@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kühlschrank</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@300;500&family=DM+Sans:wght@300;400;500&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --cream: #F5F0E8; --green: #2D5016; --green-light: #4A7C23; --green-pale: #E8F0DC;
+    --orange: #D4622A; --orange-pale: #FAEADE; --text: #1A1A14; --muted: #7A7A6A;
+    --border: #D8D0C0; --white: #FDFCF8;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); min-height: 100vh; }
+  .app { max-width: 420px; margin: 0 auto; min-height: 100vh; background: var(--white); }
+  .header { background: var(--green); padding: 20px 20px 16px; position: sticky; top: 0; z-index: 10; }
+  .header h1 { font-family: 'Fraunces', serif; font-weight: 300; font-size: 22px; color: var(--cream); }
+  .header p { font-size: 12px; color: rgba(245,240,232,0.6); margin-top: 2px; }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--white); position: sticky; top: 64px; z-index: 9; }
+  .tab { flex: 1; padding: 12px 8px; font-size: 13px; font-weight: 500; color: var(--muted); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+  .tab.active { color: var(--green); border-bottom-color: var(--green); }
+  .content { padding: 16px; }
+  .section { display: none; } .section.active { display: block; }
+  .api-bar { background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 10px; padding: 12px; margin-bottom: 14px; }
+  .api-bar label { font-size: 11px; font-weight: 500; color: #92400E; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px; }
+  .api-row { display: flex; gap: 8px; }
+  .api-row input { flex: 1; font-size: 13px; padding: 8px 10px; border: 1px solid #F59E0B; border-radius: 7px; background: white; font-family: 'DM Sans', sans-serif; outline: none; }
+  .api-saved { font-size: 11px; color: #166534; margin-top: 5px; display: none; }
+  .add-form { background: var(--green-pale); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+  .add-form h3 { font-size: 13px; font-weight: 500; color: var(--green); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .form-row { margin-bottom: 8px; }
+  input[type=text], input[type=password] { font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--white); color: var(--text); width: 100%; outline: none; }
+  input:focus { border-color: var(--green-light); }
+  .btn { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: var(--green); color: var(--cream); } .btn-primary:hover { background: var(--green-light); }
+  .btn-secondary { background: var(--border); color: var(--text); }
+  .btn-orange { background: var(--orange); color: white; width: 100%; margin-top: 4px; font-size: 15px; padding: 13px; }
+  .btn-save { background: #F59E0B; color: white; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500; white-space: nowrap; }
+  .urgency-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .urgency-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .urgency-btn { flex: 1; padding: 7px 4px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--white); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; color: var(--muted); }
+  .urgency-btn.selected-soon { border-color: var(--orange); background: var(--orange-pale); color: var(--orange); font-weight: 500; }
+  .urgency-btn.selected-week { border-color: #C4A020; background: #FBF5DC; color: #7A6010; font-weight: 500; }
+  .urgency-btn.selected-later { border-color: var(--green-light); background: var(--green-pale); color: var(--green); font-weight: 500; }
+  .inventory-list { display: flex; flex-direction: column; gap: 8px; }
+  .inv-item { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; display: flex; align-items: center; gap: 10px; }
+  .urgency-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-soon { background: var(--orange); } .dot-week { background: #C4A020; } .dot-later { background: var(--green-light); }
+  .inv-info { flex: 1; } .inv-name { font-size: 14px; font-weight: 500; } .inv-meta { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .btn-icon { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--white); cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .empty-state .emoji { font-size: 36px; margin-bottom: 10px; } .empty-state p { font-size: 14px; line-height: 1.5; }
+  .recipe-intro { background: var(--green-pale); border-radius: 12px; padding: 14px; margin-bottom: 16px; font-size: 13px; color: var(--green); line-height: 1.5; }
+  .recipe-card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+  .recipe-title { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 500; margin-bottom: 6px; }
+  .recipe-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tag { font-size: 11px; padding: 3px 8px; border-radius: 20px; font-weight: 500; }
+  .tag-urgent { background: var(--orange-pale); color: var(--orange); } .tag-time { background: var(--green-pale); color: var(--green); }
+  .recipe-desc { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+  .recipe-ingredients { margin-bottom: 12px; }
+  .recipe-ingredients h4 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 6px; }
+  .ingredient-item { font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--cream); display: flex; justify-content: space-between; }
+  .ingredient-used { color: var(--green-light); font-weight: 500; }
+  .loading { text-align: center; padding: 30px; color: var(--muted); font-size: 14px; }
+  .loading-dots::after { content: ''; animation: dots 1.5s infinite; }
+  @keyframes dots { 0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; } }
+  .cooked-modal { position: fixed; inset: 0; background: rgba(26,26,20,0.5); display: flex; align-items: flex-end; z-index: 100; padding: 16px; }
+  .cooked-sheet { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-height: 80vh; overflow-y: auto; }
+  .cooked-sheet h3 { font-family: 'Fraunces', serif; font-size: 18px; margin-bottom: 4px; }
+  .cooked-sheet p { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+  .cooked-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--cream); gap: 8px; }
+  .cooked-item-name { font-size: 14px; font-weight: 500; } .cooked-item-orig { font-size: 12px; color: var(--muted); }
+  .amount-btns { display: flex; gap: 4px; flex-shrink: 0; }
+  .amount-btn { padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--white); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; color: var(--muted); }
+  .amount-btn.selected { background: var(--green); color: white; border-color: var(--green); }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-actions .btn { flex: 1; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>🌿 Kühlschrank</h1>
+    <p id="inv-summary">0 Zutaten im Inventar</p>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('inventar',this)">Inventar</button>
+    <button class="tab" onclick="showTab('rezepte',this)">Rezepte</button>
+  </div>
+  <div class="content">
+
+    <div id="tab-inventar" class="section active">
+      <div class="add-form">
+        <h3>Zutat hinzufügen</h3>
+        <div class="form-row"><input type="text" id="zutat-name" placeholder="z.B. Spinat, Eier, Hackfleisch..." /></div>
+        <div class="form-row"><input type="text" id="zutat-menge" placeholder="z.B. 1 Tüte, 6 Stück, 1 Packung..." /></div>
+        <div class="urgency-label">Hält wie lange?</div>
+        <div class="urgency-row">
+          <button class="urgency-btn" id="urg-soon" onclick="selectUrgency('soon')">🔴 Bald weg</button>
+          <button class="urgency-btn" id="urg-week" onclick="selectUrgency('week')">🟡 Diese Woche</button>
+          <button class="urgency-btn" id="urg-later" onclick="selectUrgency('later')">🟢 Länger</button>
+        </div>
+        <button class="btn btn-primary" onclick="addItem()" style="width:100%">+ Hinzufügen</button>
+      </div>
+      <div id="inventory-list" class="inventory-list">
+        <div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.<br>Trag deine Zutaten ein!</p></div>
+      </div>
+    </div>
+
+    <div id="tab-rezepte" class="section">
+      <div class="api-bar">
+        <label>OpenAI API Key</label>
+        <div class="api-row">
+          <input type="password" id="api-key-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+          <button class="btn-save" onclick="saveApiKey()">Speichern</button>
+        </div>
+        <div class="api-saved" id="api-saved">✓ API Key gespeichert</div>
+      </div>
+      <div class="recipe-intro">Basierend auf deinem Inventar generiere ich Rezepte die zuerst aufbrauchen was bald weg muss.</div>
+      <button class="btn btn-orange" onclick="generateRecipes()">🍳 Rezepte generieren</button>
+      <div id="recipes-container" style="margin-top:16px"></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="cooked-modal" class="cooked-modal" style="display:none">
+  <div class="cooked-sheet">
+    <h3 id="cooked-title">Rezept gekocht!</h3>
+    <p>Wie viel hast du von jeder Zutat benutzt?</p>
+    <div id="cooked-items"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="confirmCooked()">Inventar aktualisieren</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let inventory = [], selectedUrgency = null, currentRecipe = null, cookedSelections = {}, apiKey = '';
+
+function saveApiKey() {
+  apiKey = document.getElementById('api-key-input').value.trim();
+  if (apiKey) { document.getElementById('api-saved').style.display = 'block'; document.getElementById('api-key-input').value = ''; }
+}
+
+function selectUrgency(u) {
+  selectedUrgency = u;
+  document.querySelectorAll('.urgency-btn').forEach(b => b.className = 'urgency-btn');
+  document.getElementById('urg-' + u).className = 'urgency-btn selected-' + u;
+}
+
+function addItem() {
+  const name = document.getElementById('zutat-name').value.trim();
+  const menge = document.getElementById('zutat-menge').value.trim();
+  if (!name || !menge || !selectedUrgency) { alert('Bitte Name, Menge und Haltbarkeit angeben!'); return; }
+  inventory.push({ id: Date.now(), name, menge, urgency: selectedUrgency });
+  document.getElementById('zutat-name').value = '';
+  document.getElementById('zutat-menge').value = '';
+  selectedUrgency = null;
+  document.querySelectorAll('.urgency-btn').forEach(b => b.className = 'urgency-btn');
+  renderInventory();
+}
+
+function removeItem(id) { inventory = inventory.filter(i => i.id !== id); renderInventory(); }
+
+function renderInventory() {
+  const list = document.getElementById('inventory-list');
+  const soonCount = inventory.filter(i => i.urgency === 'soon').length;
+  document.getElementById('inv-summary').textContent = inventory.length + ' Zutat' + (inventory.length !== 1 ? 'en' : '') + ' im Inventar' + (soonCount > 0 ? ' · ' + soonCount + ' bald ablaufend' : '');
+  if (inventory.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.</p></div>'; return; }
+  const order = { soon: 0, week: 1, later: 2 };
+  list.innerHTML = [...inventory].sort((a,b) => order[a.urgency]-order[b.urgency]).map(item => `
+    <div class="inv-item">
+      <div class="urgency-dot dot-${item.urgency}"></div>
+      <div class="inv-info">
+        <div class="inv-name">${item.name}</div>
+        <div class="inv-meta">${item.menge} · ${item.urgency==='soon'?'Bald weg':item.urgency==='week'?'Diese Woche':'Länger haltbar'}</div>
+      </div>
+      <button class="btn-icon" onclick="removeItem(${item.id})">✕</button>
+    </div>`).join('');
+}
+
+function showTab(tab, el) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  el.classList.add('active');
+}
+
+async function generateRecipes() {
+  if (!apiKey) { alert('Bitte zuerst API Key speichern!'); return; }
+  if (inventory.length === 0) { alert('Füge zuerst Zutaten ein!'); return; }
+  const container = document.getElementById('recipes-container');
+  container.innerHTML = '<div class="loading">Rezepte werden generiert<span class="loading-dots"></span></div>';
+  const soonItems = inventory.filter(i => i.urgency === 'soon');
+  const weekItems = inventory.filter(i => i.urgency === 'week');
+  const laterItems = inventory.filter(i => i.urgency === 'later');
+  const inventoryText = [
+    soonItems.length > 0 ? 'DRINGEND (bald weg): ' + soonItems.map(i => i.menge + ' ' + i.name).join(', ') : '',
+    weekItems.length > 0 ? 'Diese Woche: ' + weekItems.map(i => i.menge + ' ' + i.name).join(', ') : '',
+    laterItems.length > 0 ? 'Länger haltbar: ' + laterItems.map(i => i.menge + ' ' + i.name).join(', ') : ''
+  ].filter(Boolean).join('\n');
+  try {
+    const response = await fetch('http://127.0.0.1:5000/rezepte', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: apiKey, inventory_text: inventoryText })
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    renderRecipes(data.recipes);
+  } catch(e) {
+    container.innerHTML = '<div class="empty-state"><div class="emoji">😕</div><p>Fehler: ' + e.message + '<br><small>Läuft app.py auf Port 5000?</small></p></div>';
+  }
+}
+
+function renderRecipes(recipes) {
+  document.getElementById('recipes-container').innerHTML = recipes.map(r => `
+    <div class="recipe-card">
+      <div class="recipe-title">${r.titel}</div>
+      <div class="recipe-tags">
+        ${r.verwendet_dringend ? '<span class="tag tag-urgent">🔴 Verbraucht Dringendes</span>' : ''}
+        <span class="tag tag-time">⏱ ${r.zeit}</span>
+      </div>
+      <div class="recipe-desc">${r.beschreibung}</div>
+      <div class="recipe-ingredients">
+        <h4>Zutaten aus deinem Inventar</h4>
+        ${r.zutaten.map(z => `<div class="ingredient-item"><span>${z.name}</span><span class="ingredient-used">${z.menge}</span></div>`).join('')}
+      </div>
+      <div class="recipe-desc" style="margin-bottom:12px"><strong>Zubereitung:</strong> ${r.zubereitung}</div>
+      <button class="btn btn-primary" style="width:100%" onclick='openCookedModal(${JSON.stringify(r).replace(/'/g,"&#39;")})'>✓ Habe ich gekocht</button>
+    </div>`).join('');
+}
+
+function openCookedModal(recipe) {
+  currentRecipe = recipe; cookedSelections = {};
+  document.getElementById('cooked-title').textContent = recipe.titel + ' gekocht!';
+  document.getElementById('cooked-items').innerHTML = recipe.zutaten.map((z,i) => `
+    <div class="cooked-item">
+      <div><div class="cooked-item-name">${z.name}</div><div class="cooked-item-orig">${z.menge}</div></div>
+      <div class="amount-btns">
+        <button class="amount-btn" onclick="selectAmount(${i},'alles',this)">Alles</button>
+        <button class="amount-btn" onclick="selectAmount(${i},'haelfte',this)">1/2</button>
+        <button class="amount-btn" onclick="selectAmount(${i},'wenig',this)">Wenig</button>
+        <button class="amount-btn" onclick="selectAmount(${i},'nichts',this)">Nichts</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('cooked-modal').style.display = 'flex';
+}
+
+function selectAmount(idx, amount, btn) {
+  cookedSelections[idx] = amount;
+  btn.closest('.cooked-item').querySelectorAll('.amount-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function closeModal() { document.getElementById('cooked-modal').style.display = 'none'; }
+
+function confirmCooked() {
+  if (!currentRecipe) return;
+  currentRecipe.zutaten.forEach((z,i) => {
+    const amount = cookedSelections[i];
+    if (amount === 'alles') { inventory = inventory.filter(item => item.name.toLowerCase() !== z.name.toLowerCase()); }
+    else if (amount === 'haelfte' || amount === 'wenig') {
+      const item = inventory.find(item => item.name.toLowerCase() === z.name.toLowerCase());
+      if (item) { item.menge = amount === 'haelfte' ? 'ca. die Hälfte noch' : 'wenig übrig'; item.urgency = 'soon'; }
+    }
+  });
+  closeModal(); renderInventory();
+  alert('Inventar aktualisiert! 🎉');
+}
+
+renderInventory();
+</script>
+</body>
+</html>
