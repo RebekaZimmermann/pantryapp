@@ -27,8 +27,10 @@
   .api-row { display: flex; gap: 8px; }
   .api-row input { flex: 1; font-size: 13px; padding: 8px 10px; border: 1px solid #F59E0B; border-radius: 7px; background: white; font-family: 'DM Sans', sans-serif; outline: none; }
   .api-saved { font-size: 11px; color: #166534; margin-top: 5px; display: none; }
-  .add-form { background: var(--green-pale); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
-  .add-form h3 { font-size: 13px; font-weight: 500; color: var(--green); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .scan-bar { background: var(--green-pale); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .scan-bar label { font-size: 11px; font-weight: 500; color: var(--green); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px; }
+  .add-form { background: var(--cream); border-radius: 12px; padding: 14px; margin-bottom: 16px; border: 1px solid var(--border); }
+  .add-form h3 { font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
   .form-row { margin-bottom: 8px; }
   input[type=text], input[type=password] { font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--white); color: var(--text); width: 100%; outline: none; }
   input:focus { border-color: var(--green-light); }
@@ -91,8 +93,29 @@
   <div class="content">
 
     <div id="tab-inventar" class="section active">
+
+      <!-- API Key (auch hier damit Scanner funktioniert) -->
+      <div class="api-bar" id="api-bar-inventar">
+        <label>OpenAI API Key</label>
+        <div class="api-row">
+          <input type="password" id="api-key-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+          <button class="btn-save" onclick="saveApiKey()">Speichern</button>
+        </div>
+        <div class="api-saved" id="api-saved">✓ API Key gespeichert</div>
+      </div>
+
+      <!-- Kassenbon Scanner -->
+      <div class="scan-bar">
+        <label>Kassenbon scannen</label>
+        <input type="file" id="bon-input" accept="image/*" capture="environment" style="display:none" onchange="scanBon(this)">
+        <button class="btn btn-primary" id="scan-btn" style="width:100%" onclick="document.getElementById('bon-input').click()">
+          📷 Kassenbon fotografieren
+        </button>
+      </div>
+
+      <!-- Manuell hinzufügen -->
       <div class="add-form">
-        <h3>Zutat hinzufügen</h3>
+        <h3>Oder manuell hinzufügen</h3>
         <div class="form-row"><input type="text" id="zutat-name" placeholder="z.B. Spinat, Eier, Hackfleisch..." /></div>
         <div class="form-row"><input type="text" id="zutat-menge" placeholder="z.B. 1 Tüte, 6 Stück, 1 Packung..." /></div>
         <div class="urgency-label">Hält wie lange?</div>
@@ -103,20 +126,13 @@
         </div>
         <button class="btn btn-primary" onclick="addItem()" style="width:100%">+ Hinzufügen</button>
       </div>
+
       <div id="inventory-list" class="inventory-list">
-        <div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.<br>Trag deine Zutaten ein!</p></div>
+        <div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.<br>Fotografiere deinen Kassenbon!</p></div>
       </div>
     </div>
 
     <div id="tab-rezepte" class="section">
-      <div class="api-bar">
-        <label>OpenAI API Key</label>
-        <div class="api-row">
-          <input type="password" id="api-key-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />
-          <button class="btn-save" onclick="saveApiKey()">Speichern</button>
-        </div>
-        <div class="api-saved" id="api-saved">✓ API Key gespeichert</div>
-      </div>
       <div class="recipe-intro">Basierend auf deinem Inventar generiere ich Rezepte die zuerst aufbrauchen was bald weg muss.</div>
       <button class="btn btn-orange" onclick="generateRecipes()">🍳 Rezepte generieren</button>
       <div id="recipes-container" style="margin-top:16px"></div>
@@ -142,7 +158,44 @@ let inventory = [], selectedUrgency = null, currentRecipe = null, cookedSelectio
 
 function saveApiKey() {
   apiKey = document.getElementById('api-key-input').value.trim();
-  if (apiKey) { document.getElementById('api-saved').style.display = 'block'; document.getElementById('api-key-input').value = ''; }
+  if (apiKey) {
+    document.getElementById('api-saved').style.display = 'block';
+    document.getElementById('api-key-input').value = '';
+    document.getElementById('api-bar-inventar').style.display = 'none';
+  }
+}
+
+async function scanBon(input) {
+  if (!apiKey) { alert('Bitte zuerst API Key eingeben und speichern!'); return; }
+  const file = input.files[0];
+  if (!file) return;
+  const btn = document.getElementById('scan-btn');
+  btn.textContent = '⏳ Bon wird gescannt...';
+  btn.disabled = true;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const base64 = e.target.result.split(',')[1];
+    try {
+      const response = await fetch('/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey, image: base64 })
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      data.items.forEach(item => {
+        inventory.push({ id: Date.now() + Math.random(), name: item.name, menge: item.menge, urgency: item.haltbarkeit });
+      });
+      renderInventory();
+      btn.textContent = '✓ ' + data.items.length + ' Produkte erkannt!';
+      setTimeout(() => { btn.textContent = '📷 Kassenbon fotografieren'; btn.disabled = false; }, 3000);
+    } catch(e) {
+      alert('Fehler beim Scannen: ' + e.message);
+      btn.textContent = '📷 Kassenbon fotografieren';
+      btn.disabled = false;
+    }
+  };
+  reader.readAsDataURL(file);
 }
 
 function selectUrgency(u) {
@@ -169,7 +222,7 @@ function renderInventory() {
   const list = document.getElementById('inventory-list');
   const soonCount = inventory.filter(i => i.urgency === 'soon').length;
   document.getElementById('inv-summary').textContent = inventory.length + ' Zutat' + (inventory.length !== 1 ? 'en' : '') + ' im Inventar' + (soonCount > 0 ? ' · ' + soonCount + ' bald ablaufend' : '');
-  if (inventory.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.</p></div>'; return; }
+  if (inventory.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.<br>Fotografiere deinen Kassenbon!</p></div>'; return; }
   const order = { soon: 0, week: 1, later: 2 };
   list.innerHTML = [...inventory].sort((a,b) => order[a.urgency]-order[b.urgency]).map(item => `
     <div class="inv-item">
@@ -190,7 +243,7 @@ function showTab(tab, el) {
 }
 
 async function generateRecipes() {
-  if (!apiKey) { alert('Bitte zuerst API Key speichern!'); return; }
+  if (!apiKey) { alert('Bitte zuerst API Key im Inventar-Tab speichern!'); return; }
   if (inventory.length === 0) { alert('Füge zuerst Zutaten ein!'); return; }
   const container = document.getElementById('recipes-container');
   container.innerHTML = '<div class="loading">Rezepte werden generiert<span class="loading-dots"></span></div>';
@@ -212,7 +265,7 @@ async function generateRecipes() {
     if (data.error) throw new Error(data.error);
     renderRecipes(data.recipes);
   } catch(e) {
-    container.innerHTML = '<div class="empty-state"><div class="emoji">😕</div><p>Fehler: ' + e.message + '<br><small>Läuft app.py auf Port 5000?</small></p></div>';
+    container.innerHTML = '<div class="empty-state"><div class="emoji">😕</div><p>Fehler: ' + e.message + '</p></div>';
   }
 }
 
