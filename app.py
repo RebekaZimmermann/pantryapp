@@ -6,6 +6,10 @@ import json
 app = Flask(__name__)
 CORS(app, origins="*", allow_headers=["Content-Type"], methods=["POST", "OPTIONS"])
 
+@app.route('/')
+def index():
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html')
+
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
