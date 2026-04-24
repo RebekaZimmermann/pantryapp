@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kühlschrank</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@300;500&family=DM+Sans:wght@300;400;500&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -22,13 +23,9 @@
   .tab.active { color: var(--green); border-bottom-color: var(--green); }
   .content { padding: 16px; }
   .section { display: none; } .section.active { display: block; }
-  .api-bar { background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 10px; padding: 12px; margin-bottom: 14px; }
-  .api-bar label { font-size: 11px; font-weight: 500; color: #92400E; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px; }
-  .api-row { display: flex; gap: 8px; }
-  .api-row input { flex: 1; font-size: 13px; padding: 8px 10px; border: 1px solid #F59E0B; border-radius: 7px; background: white; font-family: 'DM Sans', sans-serif; outline: none; }
-  .api-saved { font-size: 11px; color: #166534; margin-top: 5px; }
   .scan-bar { background: var(--green-pale); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
   .scan-bar label { font-size: 11px; font-weight: 500; color: var(--green); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px; }
+  .scan-buttons { display: flex; gap: 8px; }
   .add-form { background: var(--cream); border-radius: 12px; padding: 14px; margin-bottom: 16px; border: 1px solid var(--border); }
   .add-form h3 { font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
   .form-row { margin-bottom: 8px; }
@@ -70,6 +67,29 @@
   .historie-item { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
   .historie-titel { font-size: 14px; font-weight: 500; margin-bottom: 3px; }
   .historie-meta { font-size: 12px; color: var(--muted); }
+  .api-bar { background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 10px; padding: 12px; margin-bottom: 14px; }
+  .api-bar label { font-size: 11px; font-weight: 500; color: #92400E; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px; }
+  .api-row { display: flex; gap: 8px; }
+  .api-row input { flex: 1; font-size: 13px; padding: 8px 10px; border: 1px solid #F59E0B; border-radius: 7px; background: white; font-family: 'DM Sans', sans-serif; outline: none; }
+  .api-saved { font-size: 11px; color: #166534; margin-top: 5px; }
+
+  /* Barcode Scanner Modal */
+  .barcode-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .barcode-modal h3 { color: white; font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 8px; }
+  .barcode-modal p { color: rgba(255,255,255,0.6); font-size: 13px; margin-bottom: 16px; }
+  #barcode-viewport { width: 300px; height: 220px; position: relative; border-radius: 12px; overflow: hidden; }
+  #barcode-viewport video { width: 100%; height: 100%; object-fit: cover; }
+  #barcode-viewport canvas { position: absolute; top: 0; left: 0; }
+  .scan-line { position: absolute; left: 0; right: 0; height: 2px; background: var(--orange); animation: scanline 2s infinite; z-index: 10; }
+  @keyframes scanline { 0% { top: 10%; } 50% { top: 85%; } 100% { top: 10%; } }
+  .barcode-close { margin-top: 20px; }
+
+  /* Produkt Bestätigung Modal */
+  .product-modal { position: fixed; inset: 0; background: rgba(26,26,20,0.6); display: flex; align-items: flex-end; z-index: 300; padding: 16px; }
+  .product-sheet { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; }
+  .product-sheet h3 { font-family: 'Fraunces', serif; font-size: 18px; margin-bottom: 4px; }
+  .product-sheet .product-name { font-size: 16px; font-weight: 500; color: var(--green); margin-bottom: 14px; }
+
   .cooked-modal { position: fixed; inset: 0; background: rgba(26,26,20,0.5); display: flex; align-items: flex-end; z-index: 100; padding: 16px; }
   .cooked-sheet { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-height: 80vh; overflow-y: auto; }
   .cooked-sheet h3 { font-family: 'Fraunces', serif; font-size: 18px; margin-bottom: 4px; }
@@ -100,12 +120,18 @@
     <!-- INVENTAR -->
     <div id="tab-inventar" class="section active">
       <div class="scan-bar">
-        <label>Kassenbon scannen</label>
-        <input type="file" id="bon-input" accept="image/*" capture="environment" style="display:none" onchange="scanBon(this)">
-        <button class="btn btn-primary" id="scan-btn" style="width:100%" onclick="document.getElementById('bon-input').click()">
-          📷 Kassenbon fotografieren
-        </button>
+        <label>Hinzufügen via Scanner</label>
+        <div class="scan-buttons">
+          <button class="btn btn-primary" id="barcode-btn" style="flex:1" onclick="openBarcodeScanner()">
+            🔍 Barcode scannen
+          </button>
+          <input type="file" id="bon-input" accept="image/*" capture="environment" style="display:none" onchange="scanBon(this)">
+          <button class="btn btn-secondary" id="scan-btn" style="flex:1" onclick="document.getElementById('bon-input').click()">
+            📷 Kassenbon
+          </button>
+        </div>
       </div>
+
       <div class="add-form">
         <h3>Manuell hinzufügen</h3>
         <div class="form-row"><input type="text" id="zutat-name" placeholder="z.B. Spinat, Eier, Hackfleisch..." /></div>
@@ -118,8 +144,9 @@
         </div>
         <button class="btn btn-primary" onclick="addItem()" style="width:100%">+ Hinzufügen</button>
       </div>
+
       <div id="inventory-list" class="inventory-list">
-        <div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.</p></div>
+        <div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.<br>Scanne einen Barcode oder fotografiere deinen Kassenbon!</p></div>
       </div>
     </div>
 
@@ -152,6 +179,36 @@
   </div>
 </div>
 
+<!-- Barcode Scanner Modal -->
+<div id="barcode-modal" class="barcode-modal" style="display:none">
+  <h3>Barcode scannen</h3>
+  <p>Halte die Kamera auf den Barcode</p>
+  <div id="barcode-viewport">
+    <div class="scan-line"></div>
+  </div>
+  <button class="btn btn-secondary barcode-close" onclick="closeBarcodeScanner()">Abbrechen</button>
+</div>
+
+<!-- Produkt Bestätigung Modal -->
+<div id="product-modal" class="product-modal" style="display:none">
+  <div class="product-sheet">
+    <h3>Produkt gefunden</h3>
+    <div class="product-name" id="product-name"></div>
+    <div class="form-row"><input type="text" id="product-menge" placeholder="Menge: z.B. 1 Packung, 500g..." /></div>
+    <div class="urgency-label" style="margin-top:8px">Hält wie lange?</div>
+    <div class="urgency-row" style="margin-top:6px">
+      <button class="urgency-btn" id="p-urg-soon" onclick="selectProductUrgency('soon')">🔴 Bald weg</button>
+      <button class="urgency-btn" id="p-urg-week" onclick="selectProductUrgency('week')">🟡 Diese Woche</button>
+      <button class="urgency-btn" id="p-urg-later" onclick="selectProductUrgency('later')">🟢 Länger</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeProductModal()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="confirmProduct()">+ Zum Inventar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Gekocht Modal -->
 <div id="cooked-modal" class="cooked-modal" style="display:none">
   <div class="cooked-sheet">
     <h3 id="cooked-title">Rezept gekocht!</h3>
@@ -165,29 +222,13 @@
 </div>
 
 <script>
-let inventory = [], selectedUrgency = null, currentRecipe = null, cookedSelections = {};
+let inventory = [], selectedUrgency = null, selectedProductUrgency = null;
+let currentRecipe = null, cookedSelections = {};
+let currentProductName = '', barcodeScanning = false, lastScannedCode = '';
 
 // --- Init ---
 async function init() {
   await loadInventar();
-  const res = await fetch('/settings');
-  const data = await res.json();
-  if (data.has_key) {
-    document.getElementById('api-saved').textContent = '✓ API Key gespeichert';
-  }
-}
-
-// --- API Key ---
-async function saveApiKey() {
-  const key = document.getElementById('api-key-input').value.trim();
-  if (!key) return;
-  await fetch('/settings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ openai_key: key })
-  });
-  document.getElementById('api-saved').textContent = '✓ API Key gespeichert';
-  document.getElementById('api-key-input').value = '';
 }
 
 // --- Inventar ---
@@ -231,7 +272,7 @@ function renderInventory() {
   const list = document.getElementById('inventory-list');
   const soonCount = inventory.filter(i => i.urgency === 'soon').length;
   document.getElementById('inv-summary').textContent = inventory.length + ' Zutat' + (inventory.length !== 1 ? 'en' : '') + ' im Inventar' + (soonCount > 0 ? ' · ' + soonCount + ' bald ablaufend' : '');
-  if (inventory.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.<br>Fotografiere deinen Kassenbon!</p></div>'; return; }
+  if (inventory.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.<br>Scanne einen Barcode!</p></div>'; return; }
   const order = { soon: 0, week: 1, later: 2 };
   list.innerHTML = [...inventory].sort((a,b) => order[a.urgency]-order[b.urgency]).map(item => `
     <div class="inv-item">
@@ -244,12 +285,101 @@ function renderInventory() {
     </div>`).join('');
 }
 
+// --- Barcode Scanner ---
+function openBarcodeScanner() {
+  document.getElementById('barcode-modal').style.display = 'flex';
+  barcodeScanning = true;
+  lastScannedCode = '';
+
+  Quagga.init({
+    inputStream: {
+      name: 'Live',
+      type: 'LiveStream',
+      target: document.getElementById('barcode-viewport'),
+      constraints: { facingMode: 'environment', width: 300, height: 220 }
+    },
+    decoder: { readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader'] }
+  }, function(err) {
+    if (err) { alert('Kamera konnte nicht geöffnet werden: ' + err); closeBarcodeScanner(); return; }
+    Quagga.start();
+  });
+
+  Quagga.onDetected(async function(result) {
+    const code = result.codeResult.code;
+    if (code === lastScannedCode) return;
+    lastScannedCode = code;
+    Quagga.stop();
+    closeBarcodeScanner();
+    await lookupBarcode(code);
+  });
+}
+
+function closeBarcodeScanner() {
+  document.getElementById('barcode-modal').style.display = 'none';
+  try { Quagga.stop(); } catch(e) {}
+  barcodeScanning = false;
+}
+
+async function lookupBarcode(code) {
+  try {
+    const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+    const data = await res.json();
+    if (data.status === 1 && data.product) {
+      const product = data.product;
+      const name = product.product_name_de || product.product_name || product.generic_name || 'Unbekanntes Produkt';
+      showProductModal(name);
+    } else {
+      // Produkt nicht gefunden – manuell eingeben lassen
+      showProductModal('');
+      document.getElementById('product-name').textContent = 'Produkt nicht gefunden (Barcode: ' + code + ')';
+    }
+  } catch(e) {
+    showProductModal('');
+    document.getElementById('product-name').textContent = 'Produktsuche fehlgeschlagen';
+  }
+}
+
+function showProductModal(name) {
+  currentProductName = name;
+  document.getElementById('product-name').textContent = name || 'Bitte Namen eingeben';
+  document.getElementById('product-menge').value = '';
+  selectedProductUrgency = null;
+  document.querySelectorAll('[id^="p-urg-"]').forEach(b => { b.className = 'urgency-btn'; });
+  document.getElementById('product-modal').style.display = 'flex';
+}
+
+function selectProductUrgency(u) {
+  selectedProductUrgency = u;
+  document.querySelectorAll('[id^="p-urg-"]').forEach(b => b.className = 'urgency-btn');
+  document.getElementById('p-urg-' + u).className = 'urgency-btn selected-' + u;
+}
+
+function closeProductModal() {
+  document.getElementById('product-modal').style.display = 'none';
+}
+
+async function confirmProduct() {
+  const name = currentProductName || document.getElementById('zutat-name').value.trim();
+  const menge = document.getElementById('product-menge').value.trim() || '1 Stück';
+  if (!name) { alert('Bitte Produktname eingeben!'); return; }
+  if (!selectedProductUrgency) { alert('Bitte Haltbarkeit auswählen!'); return; }
+  const res = await fetch('/inventar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, menge, urgency: selectedProductUrgency })
+  });
+  const item = await res.json();
+  inventory.push(item);
+  renderInventory();
+  closeProductModal();
+}
+
 // --- Kassenbon Scanner ---
 async function scanBon(input) {
   const file = input.files[0];
   if (!file) return;
   const btn = document.getElementById('scan-btn');
-  btn.textContent = '⏳ Bon wird gescannt...';
+  btn.textContent = '⏳ Wird gescannt...';
   btn.disabled = true;
   const reader = new FileReader();
   reader.onload = async function(e) {
@@ -263,11 +393,11 @@ async function scanBon(input) {
       const data = await response.json();
       if (data.error) throw new Error(data.error);
       await loadInventar();
-      btn.textContent = '✓ ' + data.items.length + ' Produkte erkannt!';
-      setTimeout(() => { btn.textContent = '📷 Kassenbon fotografieren'; btn.disabled = false; }, 3000);
+      btn.textContent = '✓ ' + data.items.length + ' erkannt!';
+      setTimeout(() => { btn.textContent = '📷 Kassenbon'; btn.disabled = false; }, 3000);
     } catch(e) {
       alert('Fehler: ' + e.message);
-      btn.textContent = '📷 Kassenbon fotografieren';
+      btn.textContent = '📷 Kassenbon';
       btn.disabled = false;
     }
   };
@@ -355,7 +485,6 @@ function closeModal() { document.getElementById('cooked-modal').style.display = 
 
 async function confirmCooked() {
   if (!currentRecipe) return;
-  // Inventar aktualisieren
   for (const [i, z] of currentRecipe.zutaten.entries()) {
     const amount = cookedSelections[i];
     const item = inventory.find(item => item.name.toLowerCase() === z.name.toLowerCase());
@@ -370,7 +499,6 @@ async function confirmCooked() {
       });
     }
   }
-  // In Historie speichern
   await fetch('/historie', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -386,15 +514,25 @@ async function loadHistorie() {
   const res = await fetch('/historie');
   const data = await res.json();
   const list = document.getElementById('historie-list');
-  if (data.length === 0) {
-    list.innerHTML = '<div class="empty-state"><div class="emoji">🍽️</div><p>Noch nichts gekocht.</p></div>';
-    return;
-  }
+  if (data.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">🍽️</div><p>Noch nichts gekocht.</p></div>'; return; }
   list.innerHTML = data.map(r => `
     <div class="historie-item">
       <div class="historie-titel">${r.titel}</div>
       <div class="historie-meta">${r.gekocht_am} · ${r.zutaten.map(z => z.name).join(', ')}</div>
     </div>`).join('');
+}
+
+// --- Einstellungen ---
+async function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) return;
+  await fetch('/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ openai_key: key })
+  });
+  document.getElementById('api-saved').textContent = '✓ API Key gespeichert';
+  document.getElementById('api-key-input').value = '';
 }
 
 init();
