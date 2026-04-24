@@ -308,8 +308,13 @@ def mealplan():
         week = [x for x in virtual_inventory if x['urgency'] == 'week']
         later = [x for x in virtual_inventory if x['urgency'] == 'later']
 
-        if not soon and not week and not later:
-            break
+        # Phase bestimmen
+        phase1 = len(soon_names) > 0  # noch dringende Zutaten vorhanden
+        phase2 = not phase1
+
+        already_planned = ', '.join([m['titel'] for m in plan]) if plan else 'keine'
+        todays_meals = [m for m in plan if m.get('tag') == tag]
+        todays_titles = ', '.join([m['titel'] for m in todays_meals]) if todays_meals else 'keine'
 
         # Gespeichertes Rezept einplanen falls vorhanden
         if gespeicherte_idx < len(gespeicherte):
@@ -332,37 +337,82 @@ def mealplan():
                 for inv_item in list(virtual_inventory):
                     if inv_item['name'].lower() == zn:
                         virtual_inventory.remove(inv_item)
+                        if inv_item['name'] in soon_names:
+                            soon_names.remove(inv_item['name'])
                         break
             continue
 
-        inv_parts = []
-        if soon: inv_parts.append('DRINGEND: ' + ', '.join(f"{x['menge']} {x['name']}" for x in soon))
-        if week: inv_parts.append('Diese Woche: ' + ', '.join(f"{x['menge']} {x['name']}" for x in week))
-        if later: inv_parts.append('Laenger haltbar: ' + ', '.join(f"{x['menge']} {x['name']}" for x in later))
-
-        already_planned = ', '.join([m['titel'] for m in plan]) if plan else 'keine'
-        urgency_instruction = ''
-        if tag <= 2 and soon:
-            urgency_instruction = f'\nWICHTIG: Tag {tag}. MUSS dringende Zutat verwenden: {", ".join(soon_names)}'
-
         try:
-            response = client.chat.completions.create(
-                model='gpt-4o', max_tokens=800,
-                messages=[
-                    {"role": "system", "content": "Du planst Mahlzeiten fuer eine Person. Generiere GENAU 1 Rezept als JSON. Verwende NUR Zutaten aus dem Inventar plus Wasser/Salz/Pfeffer/Oel. Dringende Zutaten MUESSEN in Tag 1-2. Nicht wiederholen. NUR JSON. Format: {\"titel\":\"Name\",\"zeit\":\"20 Min\",\"beschreibung\":\"Kurz\",\"zutaten\":[{\"name\":\"Spinat\",\"menge\":\"ganze Tuete\",\"urgency\":\"soon\"}],\"zubereitung\":\"Schritt 1: ...\"}"},
-                    {"role": "user", "content": f"Inventar:\n{chr(10).join(inv_parts)}\n\nBereits geplant: {already_planned}\nTag {tag} von {tage}, {mahlzeit_label}{urgency_instruction}"}
-                ]
-            )
+            if phase2:
+                # Phase 2: Freie Planung – abwechslungsreich, ausgewogen, budget-bewusst
+                budget_pro_mahlzeit = (budget / total) if budget > 0 else 0
+                inv_rest = ', '.join([f"{x['menge']} {x['name']}" for x in virtual_inventory]) if virtual_inventory else 'nichts mehr'
+
+                response = client.chat.completions.create(
+                    model='gpt-4o', max_tokens=800,
+                    messages=[
+                        {"role": "system", "content": """Du planst Mahlzeiten für eine einzelne Person in Deutschland.
+Generiere GENAU 1 Rezept als JSON.
+REGELN:
+- Du darfst ALLE Zutaten verwenden – nicht nur Inventar
+- Jede Mahlzeit MUSS enthalten: Protein (Fleisch/Fisch/Hülsenfrüchte/Eier/Tofu) + Gemüse + Kohlenhydrate
+- Abwechslung ist Pflicht: verschiedene Gemüsesorten, verschiedene Proteinquellen, verschiedene Küchen (mediterran, asiatisch, deutsch, etc.)
+- Nicht wiederholen was bereits geplant ist
+- Realistische, leckere Alltagsgerichte für 1 Person
+- Budget pro Mahlzeit einhalten
+- Korrekte deutsche Umlaute
+- NUR JSON, kein Text davor/danach
+Format: {"titel":"Name","zeit":"25 Min","beschreibung":"Kurze appetitliche Beschreibung","zutaten":[{"name":"Hähnchenbrust","menge":"1 Stück (ca. 200g)","kaufen":true},{"name":"Brokkoli","menge":"1 kleiner Kopf","kaufen":true},{"name":"Nudeln","menge":"100g","kaufen":false}],"zubereitung":"Schritt 1: ...","naehrstoffe":{"protein":"Hähnchen","gemuese":"Brokkoli","kohlenhydrate":"Nudeln"}}
+Setze "kaufen":true für neue Zutaten die eingekauft werden müssen, "kaufen":false für Inventar-Zutaten."""},
+                        {"role": "user", "content": f"""Noch im Inventar (kostenlos nutzbar): {inv_rest}
+Budget pro Mahlzeit: {f'ca. {budget_pro_mahlzeit:.2f} €' if budget_pro_mahlzeit > 0 else 'kein festes Budget, aber günstig kochen'}
+Heute bereits geplant: {todays_titles}
+Alle geplanten Gerichte bisher (nicht wiederholen): {already_planned}
+Mahlzeit: Tag {tag} von {tage}, {mahlzeit_label}
+
+Wähle andere Proteinquelle und andere Gemüsesorten als bereits geplant. Sei kreativ und abwechslungsreich."""}
+                    ]
+                )
+            else:
+                # Phase 1: Nur Inventar verwenden, dringendes zuerst
+                inv_parts = []
+                if soon: inv_parts.append('DRINGEND (MUSS verwendet werden): ' + ', '.join(f"{x['menge']} {x['name']}" for x in soon))
+                if week: inv_parts.append('Diese Woche: ' + ', '.join(f"{x['menge']} {x['name']}" for x in week))
+                if later: inv_parts.append('Länger haltbar: ' + ', '.join(f"{x['menge']} {x['name']}" for x in later))
+
+                urgency_instruction = ''
+                if soon:
+                    urgency_instruction = f'\nWICHTIG: MUSS dringende Zutat verwenden: {", ".join(soon_names)}'
+
+                response = client.chat.completions.create(
+                    model='gpt-4o', max_tokens=800,
+                    messages=[
+                        {"role": "system", "content": """Du planst Mahlzeiten für eine Person.
+Generiere GENAU 1 Rezept als JSON.
+REGELN:
+- Verwende NUR Zutaten aus dem Inventar plus Wasser/Salz/Pfeffer/Öl
+- Dringende Zutaten MÜSSEN verwendet werden
+- Nicht wiederholen
+- Korrekte deutsche Umlaute
+- NUR JSON
+Format: {"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","zutaten":[{"name":"Spinat","menge":"ganze Tüte","urgency":"soon","kaufen":false}],"zubereitung":"Schritt 1: ..."}"""},
+                        {"role": "user", "content": f"Inventar:\n{chr(10).join(inv_parts)}\n\nBereits geplant: {already_planned}\nTag {tag} von {tage}, {mahlzeit_label}{urgency_instruction}"}
+                    ]
+                )
+
             text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
             rezept = json.loads(text)
             rezept['tag'] = tag
             rezept['mahlzeit'] = mahlzeit_label
             rezept['quelle'] = 'ki'
+            rezept['phase'] = 2 if phase2 else 1
             plan.append(rezept)
 
             for zutat in rezept.get('zutaten', []):
                 zn = zutat['name'].lower()
                 zm = zutat.get('menge', '').lower()
+                if zutat.get('kaufen', False):
+                    continue  # Neue Zutat – nicht im Inventar
                 for inv_item in list(virtual_inventory):
                     if inv_item['name'].lower() == zn:
                         if any(w in zm for w in ['ganz', 'alles', 'alle', 'komplett', 'gesamt']):
@@ -373,9 +423,10 @@ def mealplan():
                             inv_item['menge'] = 'ca. Hälfte noch'
                             inv_item['urgency'] = 'soon'
                         else:
-                            # Standardmäßig: Zutat als größtenteils verbraucht markieren
                             inv_item['menge'] = 'wenig übrig'
                             inv_item['urgency'] = 'soon'
+                            if inv_item['name'] in soon_names:
+                                soon_names.remove(inv_item['name'])
                         break
         except Exception as e:
             plan.append({'tag': tag, 'mahlzeit': mahlzeit_label, 'titel': 'Fehler', 'beschreibung': str(e), 'zutaten': [], 'zubereitung': '', 'quelle': 'ki'})

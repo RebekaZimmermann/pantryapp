@@ -825,7 +825,7 @@ function renderMealPlan(data) {
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div style="display:flex;align-items:center">
             <span class="drag-handle" title="Verschieben">⠿</span>
-            <div class="plan-mahlzeit">${m.mahlzeit}${isGespeichert ? ' · <span style="color:#4C3DB5;font-size:10px">📖 Gespeichert</span>' : ''}</div>
+            <div class="plan-mahlzeit">${m.mahlzeit}${isGespeichert ? ' · <span style="color:#4C3DB5;font-size:10px">📖 Gespeichert</span>' : ''}${m.phase === 2 ? ' · <span style="color:var(--green);font-size:10px">🛒 Einkauf</span>' : ''}</div>
           </div>
           <div style="display:flex;align-items:center;gap:4px">
             ${urgentCount > 0 ? `<span style="font-size:10px;background:var(--orange-pale);color:var(--orange);padding:2px 6px;border-radius:10px;font-weight:500">🔴 ${urgentCount}</span>` : ''}
