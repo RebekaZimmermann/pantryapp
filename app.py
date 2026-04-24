@@ -259,6 +259,14 @@ def mealplan():
             messages=[
                 {"role": "system", "content": """Du bist ein Einkaufsplaner fuer Deutschland (REWE).
 Antworte NUR mit validem JSON ohne Text davor/danach.
+
+STRENGE REGELN:
+- In "einkaufsliste" NUR Zutaten die entweder:
+  a) typ "fehlend": im Meal Plan benoetigt aber NICHT im aktuellen Inventar
+  b) typ "extra": explizit in extra_zutaten vorgeschlagen
+- KEINE anderen Zutaten erfinden
+- Jede Zutat in extra_zutaten muss auch in einkaufsliste erscheinen wenn sie ins Budget passt
+
 Format:
 {
   "extra_zutaten": [
@@ -275,19 +283,21 @@ Format:
   },
   "budget_verwendet": 5.50,
   "budget_gesamt": 20.00
-}
-Kategorien: Obst & Gemuese, Kuehlregal, Tiefkuehl, Brot & Backwaren, Trockenwaren & Konserven, Getraenke, Sonstiges
-typ: "fehlend" = wird fuer Plan benoetigt aber nicht im Inventar, "extra" = optionale Verbesserung"""},
-                {"role": "user", "content": f"""Aktuelles Inventar: {all_items_text}
-Geplante Mahlzeiten: {plan_text}
+}"""},
+                {"role": "user", "content": f"""Aktuelles Inventar (diese Zutaten sind bereits vorhanden, NICHT auf die Einkaufsliste):
+{all_items_text}
+
+Geplante Mahlzeiten und deren Zutaten:
+{chr(10).join([f"- {m['titel']}: {', '.join([z['name'] for z in m.get('zutaten',[])])}" for m in plan])}
+
 {budget_text}
 
 Aufgaben:
-1. Finde Zutaten die fuer den Meal Plan fehlen (nicht im Inventar)
-2. Schlage optionale Extra-Zutaten vor die Rezepte verbessern wuerden
-3. Erstelle eine vollstaendige Einkaufsliste nach REWE-Kategorien sortiert
-4. Halte dich an das Budget (fehlende Zutaten haben Prioritaet, dann Extra-Zutaten)
-5. Schaetze realistische deutsche Supermarktpreise"""}
+1. Finde Zutaten die im Plan vorkommen aber NICHT im Inventar sind (typ: fehlend)
+2. Schlage 2-3 optionale Extra-Zutaten vor die bestehende Rezepte verbessern (typ: extra)
+3. Einkaufsliste = nur fehlende + extra Zutaten, nach REWE-Kategorien sortiert
+4. Halte dich ans Budget: fehlende Zutaten haben Prioritaet
+5. Schaetze realistische deutsche REWE-Supermarktpreise fuer alle Zutaten"""}
             ]
         )
         text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
