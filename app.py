@@ -22,7 +22,7 @@ db = SQLAlchemy(app)
 # Modelle
 class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    openai_key = db.Column(db.String(200), nullable=False)
+    openai_key = os.environ.get('OPENAI_API_KEY')
 
 class InventarItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -51,23 +51,6 @@ def after_request(response):
 def index():
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html')
 
-# --- Settings (API Key) ---
-@app.route('/settings', methods=['GET'])
-def get_settings():
-    s = Settings.query.first()
-    return jsonify({'has_key': s is not None})
-
-@app.route('/settings', methods=['POST'])
-def save_settings():
-    data = request.json
-    s = Settings.query.first()
-    if s:
-        s.openai_key = data['openai_key']
-    else:
-        s = Settings(openai_key=data['openai_key'])
-        db.session.add(s)
-    db.session.commit()
-    return jsonify({'ok': True})
 
 # --- Inventar ---
 @app.route('/inventar', methods=['GET'])
