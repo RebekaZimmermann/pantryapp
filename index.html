@@ -280,28 +280,95 @@
         </div>
         <div class="api-saved" id="api-saved"></div>
       </div>
-      <div style="background:var(--green-pale);border-radius:12px;padding:14px;margin-bottom:14px">
-        <div style="font-size:11px;font-weight:500;color:var(--green);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Ernährungspräferenz</div>
+
+      <!-- Ernährung -->
+      <div style="background:var(--green-pale);border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:500;color:var(--green);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">🥗 Ernährung</div>
         <div style="display:flex;flex-direction:column;gap:8px" id="ernaehrung-options">
-          <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
-            <input type="radio" name="ernaehrung" value="alles" style="accent-color:var(--green);width:16px;height:16px"> Alles – keine Einschränkungen
-          </label>
-          <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
-            <input type="radio" name="ernaehrung" value="vegetarisch" style="accent-color:var(--green);width:16px;height:16px"> Vegetarisch
-          </label>
-          <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
-            <input type="radio" name="ernaehrung" value="vegan" style="accent-color:var(--green);width:16px;height:16px"> Vegan
-          </label>
-          <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
-            <input type="radio" name="ernaehrung" value="pescetarisch" style="accent-color:var(--green);width:16px;height:16px"> Pescetarisch (kein Fleisch, aber Fisch)
-          </label>
-          <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
-            <input type="radio" name="ernaehrung" value="kein_schwein" style="accent-color:var(--green);width:16px;height:16px"> Kein Schweinefleisch
-          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><input type="radio" name="ernaehrung" value="alles" style="accent-color:var(--green)"> Alles</label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><input type="radio" name="ernaehrung" value="vegetarisch" style="accent-color:var(--green)"> Vegetarisch</label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><input type="radio" name="ernaehrung" value="vegan" style="accent-color:var(--green)"> Vegan</label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><input type="radio" name="ernaehrung" value="pescetarisch" style="accent-color:var(--green)"> Pescetarisch</label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><input type="radio" name="ernaehrung" value="kein_schwein" style="accent-color:var(--green)"> Kein Schweinefleisch</label>
         </div>
-        <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="saveErnaehrung()">Speichern</button>
-        <div id="ernaehrung-saved" style="font-size:11px;color:#166534;margin-top:5px;display:none">✓ Gespeichert</div>
       </div>
+
+      <!-- Cuisines -->
+      <div style="background:var(--cream);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">🌍 Bevorzugte Küchen</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="italienisch" style="accent-color:var(--green)"> Italienisch</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="asiatisch" style="accent-color:var(--green)"> Asiatisch</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="mediterran" style="accent-color:var(--green)"> Mediterran</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="deutsch" style="accent-color:var(--green)"> Deutsch</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="mexikanisch" style="accent-color:var(--green)"> Mexikanisch</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="indisch" style="accent-color:var(--green)"> Indisch</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="japanisch" style="accent-color:var(--green)"> Japanisch</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="griechisch" style="accent-color:var(--green)"> Griechisch</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="französisch" style="accent-color:var(--green)"> Französisch</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="türkisch" style="accent-color:var(--green)"> Türkisch</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="vietnamesisch" style="accent-color:var(--green)"> Vietnamesisch</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="cuisine-cb" value="amerikanisch" style="accent-color:var(--green)"> Amerikanisch</label>
+        </div>
+      </div>
+
+      <!-- Schwierigkeit -->
+      <div style="background:var(--cream);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">👨‍🍳 Schwierigkeit</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><input type="radio" name="schwierigkeit" value="einfach" style="accent-color:var(--green)"> Einfach (max. 20 Min, wenige Zutaten)</label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><input type="radio" name="schwierigkeit" value="mittel" style="accent-color:var(--green)"> Mittel (20–40 Min)</label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><input type="radio" name="schwierigkeit" value="anspruchsvoll" style="accent-color:var(--green)"> Anspruchsvoll (auch aufwändig)</label>
+        </div>
+      </div>
+
+      <!-- Küchentools -->
+      <div style="background:var(--cream);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">🔧 Verfügbare Geräte</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="tool-cb" value="mixer" style="accent-color:var(--green)"> Mixer</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="tool-cb" value="stabmixer" style="accent-color:var(--green)"> Stabmixer</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="tool-cb" value="backofen" style="accent-color:var(--green)"> Backofen</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="tool-cb" value="mikrowelle" style="accent-color:var(--green)"> Mikrowelle</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="tool-cb" value="dampfgarer" style="accent-color:var(--green)"> Dampfgarer</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="tool-cb" value="slow cooker" style="accent-color:var(--green)"> Slow Cooker</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="tool-cb" value="wok" style="accent-color:var(--green)"> Wok</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="tool-cb" value="grill" style="accent-color:var(--green)"> Grill</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="tool-cb" value="küchenmaschine" style="accent-color:var(--green)"> Küchenmaschine</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" class="tool-cb" value="reiskocher" style="accent-color:var(--green)"> Reiskocher</label>
+        </div>
+      </div>
+
+      <!-- Präferenzen -->
+      <div style="background:var(--cream);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">❤️ Lebensmittelpräferenzen</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Mag ich besonders gerne (kommagetrennt):</div>
+        <div class="form-row"><input type="text" id="pref-mag" placeholder="z.B. Tomaten, grüne Äpfel, Lachs..." /></div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;margin-top:8px">Mag ich nicht / esse ich nie (kommagetrennt):</div>
+        <div class="form-row"><input type="text" id="pref-mag-nicht" placeholder="z.B. Porree, Rosenkohl, Innereien..." /></div>
+      </div>
+
+      <!-- Snacks -->
+      <div style="background:var(--cream);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">🍎 Snacks im Meal Plan</div>
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;margin-bottom:12px">
+          <input type="checkbox" id="snacks-aktiv-cb" style="accent-color:var(--green);width:16px;height:16px"> Snacks einplanen
+        </label>
+        <div id="snack-budget-section" style="display:none">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Snack-Budget:</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><input type="radio" name="snack-budget-typ" value="im_budget" style="accent-color:var(--green)"> Im Gesamtbudget enthalten</label>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><input type="radio" name="snack-budget-typ" value="eigenes" style="accent-color:var(--green)"> Eigenes Snack-Budget</label>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer"><input type="radio" name="snack-budget-typ" value="kein_tracking" style="accent-color:var(--green)"> Kein Budget-Tracking</label>
+          </div>
+          <div id="snack-budget-input" style="display:none;margin-top:8px">
+            <input type="number" id="snack-budget-val" placeholder="Snack-Budget in € pro Woche" min="0" step="1" />
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%" onclick="saveAllSettings()">💾 Einstellungen speichern</button>
+      <div id="settings-saved" style="font-size:11px;color:#166534;margin-top:8px;text-align:center;display:none">✓ Gespeichert</div>
     </div>
   </div>
 </div>
@@ -371,6 +438,7 @@
     </div>
   </div>
 </div>
+<div id="cooked-modal" style="display:none;position:fixed;inset:0;background:rgba(26,26,20,0.5);align-items:flex-end;z-index:100;padding:16px">
   <div class="cooked-sheet">
     <h3 id="cooked-title">Rezept gekocht!</h3>
     <p>Wie viel hast du von jeder Zutat benutzt?</p>
@@ -870,7 +938,7 @@ function renderMealPlan(data) {
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div style="display:flex;align-items:center">
             <span class="drag-handle" title="Verschieben">⠿</span>
-            <div class="plan-mahlzeit">${m.mahlzeit}${isGespeichert ? ' · <span style="color:#4C3DB5;font-size:10px">📖 Gespeichert</span>' : ''}${m.phase === 2 ? ' · <span style="color:var(--green);font-size:10px">🛒 Einkauf</span>' : ''}${m.quelle === 'meal_prep' ? ' · <span style="color:#0369A1;font-size:10px">🍱 Meal Prep</span>' : ''}</div>
+            <div class="plan-mahlzeit">${m.mahlzeit}${isGespeichert ? ' · <span style="color:#4C3DB5;font-size:10px">📖 Gespeichert</span>' : ''}${m.phase === 2 ? ' · <span style="color:var(--green);font-size:10px">🛒 Einkauf</span>' : ''}${m.quelle === 'meal_prep' ? ' · <span style="color:#0369A1;font-size:10px">🍱 Meal Prep</span>' : ''}${m.mahlzeit === 'Snack' ? ' · <span style="color:#7C3AED;font-size:10px">🍎 Snack</span>' : ''}</div>
           </div>
           <div style="display:flex;align-items:center;gap:4px">
             ${urgentCount > 0 ? `<span style="font-size:10px;background:var(--orange-pale);color:var(--orange);padding:2px 6px;border-radius:10px;font-weight:500">🔴 ${urgentCount}</span>` : ''}
@@ -1104,20 +1172,60 @@ async function saveApiKey() {
 async function loadErnaehrung() {
   try {
     const res = await fetch('/user-settings');
-    const data = await res.json();
-    const radios = document.querySelectorAll('input[name="ernaehrung"]');
-    radios.forEach(r => { if (r.value === data.ernaehrung) r.checked = true; });
+    const d = await res.json();
+    // Ernährung
+    document.querySelectorAll('input[name="ernaehrung"]').forEach(r => { if (r.value === d.ernaehrung) r.checked = true; });
+    // Cuisines
+    const cuisines = d.cuisines || [];
+    document.querySelectorAll('.cuisine-cb').forEach(cb => { cb.checked = cuisines.includes(cb.value); });
+    // Schwierigkeit
+    document.querySelectorAll('input[name="schwierigkeit"]').forEach(r => { if (r.value === d.schwierigkeit) r.checked = true; });
+    // Tools
+    const tools = d.tools || [];
+    document.querySelectorAll('.tool-cb').forEach(cb => { cb.checked = tools.includes(cb.value); });
+    // Präferenzen
+    if (document.getElementById('pref-mag')) document.getElementById('pref-mag').value = d.mag || '';
+    if (document.getElementById('pref-mag-nicht')) document.getElementById('pref-mag-nicht').value = d.mag_nicht || '';
+    // Snacks
+    const snacksCb = document.getElementById('snacks-aktiv-cb');
+    if (snacksCb) {
+      snacksCb.checked = d.snacks_aktiv;
+      document.getElementById('snack-budget-section').style.display = d.snacks_aktiv ? 'block' : 'none';
+    }
+    document.querySelectorAll('input[name="snack-budget-typ"]').forEach(r => { if (r.value === d.snack_budget_typ) r.checked = true; });
+    if (d.snack_budget_typ === 'eigenes') document.getElementById('snack-budget-input').style.display = 'block';
+    if (document.getElementById('snack-budget-val')) document.getElementById('snack-budget-val').value = d.snack_budget || '';
   } catch(e) {}
 }
 
-async function saveErnaehrung() {
-  const selected = document.querySelector('input[name="ernaehrung"]:checked');
-  if (!selected) return;
-  await fetch('/user-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ernaehrung: selected.value }) });
-  const saved = document.getElementById('ernaehrung-saved');
-  saved.style.display = 'block';
-  setTimeout(() => { saved.style.display = 'none'; }, 2000);
+async function saveAllSettings() {
+  const ernaehrung = document.querySelector('input[name="ernaehrung"]:checked')?.value || 'alles';
+  const cuisines = [...document.querySelectorAll('.cuisine-cb:checked')].map(cb => cb.value);
+  const schwierigkeit = document.querySelector('input[name="schwierigkeit"]:checked')?.value || 'mittel';
+  const tools = [...document.querySelectorAll('.tool-cb:checked')].map(cb => cb.value);
+  const mag = document.getElementById('pref-mag')?.value.trim() || '';
+  const mag_nicht = document.getElementById('pref-mag-nicht')?.value.trim() || '';
+  const snacks_aktiv = document.getElementById('snacks-aktiv-cb')?.checked || false;
+  const snack_budget_typ = document.querySelector('input[name="snack-budget-typ"]:checked')?.value || 'im_budget';
+  const snack_budget = parseFloat(document.getElementById('snack-budget-val')?.value) || 0;
+
+  await fetch('/user-settings', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ernaehrung, cuisines, schwierigkeit, tools, mag, mag_nicht, snacks_aktiv, snack_budget_typ, snack_budget })
+  });
+  const saved = document.getElementById('settings-saved');
+  if (saved) { saved.style.display = 'block'; setTimeout(() => { saved.style.display = 'none'; }, 2000); }
 }
+
+// Snack Budget Toggle
+document.addEventListener('change', function(e) {
+  if (e.target.id === 'snacks-aktiv-cb') {
+    document.getElementById('snack-budget-section').style.display = e.target.checked ? 'block' : 'none';
+  }
+  if (e.target.name === 'snack-budget-typ') {
+    document.getElementById('snack-budget-input').style.display = e.target.value === 'eigenes' ? 'block' : 'none';
+  }
+});
 
 // Plan Gekocht
 let currentGekochIdx = null;
