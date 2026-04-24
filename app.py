@@ -112,12 +112,17 @@ def rezepte():
 
     client = OpenAI(api_key=openai_key)
     system_prompt = """Du bist ein Küchenchef der für eine einzelne Person kocht.
-Generiere genau 3 leckere Rezeptvorschläge basierend auf dem Inventar.
-Wichtig:
-- Priorisiere Zutaten die bald weg müssen
-- Mengen in natürlichen Einheiten (nicht Gramm): "die Hälfte der Tüte Spinat", "2 von den 6 Eiern"
-- Rezepte müssen realistisch und wirklich lecker sein
+Generiere genau 3 Rezeptvorschläge NUR aus den angegebenen Zutaten.
+
+STRENGE REGELN:
+- Verwende AUSSCHLIESSLICH Zutaten die im Inventar stehen
+- Erlaubt sind zusätzlich nur: Wasser, Salz, Pfeffer, Öl – sonst NICHTS
+- Erfinde keine Zutaten, kaufe nichts dazu
+- Falls das Inventar zu wenig hergibt: einfachere Rezepte generieren
+- Mengen in natürlichen Einheiten: "die Hälfte der Tüte Spinat", "2 von den 6 Eiern"
+- Priorisiere was bald weg muss
 - Antworte NUR mit validem JSON Array, kein Text davor oder danach
+
 Format: [{"titel":"Name","zeit":"20 Min","beschreibung":"Kurze appetitliche Beschreibung","verwendet_dringend":true,"zutaten":[{"name":"Spinat","menge":"die ganze Tüte"}],"zubereitung":"Kurze Schritte in 2-3 Sätzen"}]"""
 
     try:
