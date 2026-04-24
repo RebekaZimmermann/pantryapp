@@ -11,7 +11,6 @@ CORS(app, origins="*", allow_headers=["Content-Type"], methods=["POST", "OPTIONS
 
 # Datenbank – lokal SQLite, auf Railway PostgreSQL
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///kuehlschrank.db')
-# Railway gibt postgres:// zurück, SQLAlchemy braucht postgresql://
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
@@ -20,10 +19,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # Modelle
-class Settings(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    openai_key = os.environ.get('OPENAI_API_KEY')
-
 class InventarItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -50,7 +45,6 @@ def after_request(response):
 @app.route('/')
 def index():
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html')
-
 
 # --- Inventar ---
 @app.route('/inventar', methods=['GET'])
@@ -106,14 +100,17 @@ def add_historie():
 def rezepte():
     if request.method == 'OPTIONS':
         return jsonify({'ok': True}), 200
-    data = request.json
-    s = Settings.query.first()
-    if not s:
+
+    openai_key = os.environ.get('OPENAI_API_KEY')
+    if not openai_key:
         return jsonify({'error': 'Kein API Key gespeichert'}), 400
+
+    data = request.json
     inventory_text = data.get('inventory_text')
     if not inventory_text:
         return jsonify({'error': 'inventory_text erforderlich'}), 400
-    client = OpenAI(api_key=s.openai_key)
+
+    client = OpenAI(api_key=openai_key)
     system_prompt = """Du bist ein Küchenchef der für eine einzelne Person kocht.
 Generiere genau 3 leckere Rezeptvorschläge basierend auf dem Inventar.
 Wichtig:
@@ -122,6 +119,7 @@ Wichtig:
 - Rezepte müssen realistisch und wirklich lecker sein
 - Antworte NUR mit validem JSON Array, kein Text davor oder danach
 Format: [{"titel":"Name","zeit":"20 Min","beschreibung":"Kurze appetitliche Beschreibung","verwendet_dringend":true,"zutaten":[{"name":"Spinat","menge":"die ganze Tüte"}],"zubereitung":"Kurze Schritte in 2-3 Sätzen"}]"""
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o", max_tokens=1500,
@@ -140,14 +138,17 @@ Format: [{"titel":"Name","zeit":"20 Min","beschreibung":"Kurze appetitliche Besc
 def scan():
     if request.method == 'OPTIONS':
         return jsonify({'ok': True}), 200
-    data = request.json
-    s = Settings.query.first()
-    if not s:
+
+    openai_key = os.environ.get('OPENAI_API_KEY')
+    if not openai_key:
         return jsonify({'error': 'Kein API Key gespeichert'}), 400
+
+    data = request.json
     image_base64 = data.get('image')
     if not image_base64:
         return jsonify({'error': 'image erforderlich'}), 400
-    client = OpenAI(api_key=s.openai_key)
+
+    client = OpenAI(api_key=openai_key)
     try:
         response = client.chat.completions.create(
             model="gpt-4o", max_tokens=1000,
@@ -165,7 +166,6 @@ Haltbarkeit: soon=frisches Obst/Gemüse/Fleisch/Fisch, week=Milch/Joghurt/Käse/
         )
         text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
         items = json.loads(text)
-        # Direkt in Datenbank speichern
         for item in items:
             db.session.add(InventarItem(name=item['name'], menge=item['menge'], urgency=item['haltbarkeit']))
         db.session.commit()
