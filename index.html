@@ -548,14 +548,44 @@ function renderInventory() {
 }
 
 function renderInvItem(item) {
-  return `<div class="inv-item">
+  return `<div class="inv-item" id="inv-item-${item.id}">
     <div class="urgency-dot dot-${item.urgency}"></div>
-    <div class="inv-info">
+    <div class="inv-info" id="inv-info-${item.id}">
       <div class="inv-name">${item.name}</div>
       <div class="inv-meta">${item.menge}</div>
     </div>
-    <button class="btn-icon" onclick="removeItem(${item.id})">✕</button>
+    <div style="display:flex;gap:4px">
+      <button class="btn-icon" onclick="editItem(${item.id},'${item.name.replace(/'/g,"\\'")}','${item.menge.replace(/'/g,"\\'")}','${item.urgency}')" title="Bearbeiten" style="font-size:11px">✏️</button>
+      <button class="btn-icon" onclick="removeItem(${item.id})">✕</button>
+    </div>
   </div>`;
+}
+
+function editItem(id, name, menge, urgency) {
+  const info = document.getElementById('inv-info-' + id);
+  if (!info) return;
+  const urgencyLabels = { soon: '🔴 Bald weg', week: '🟡 Diese Woche', later: '🟢 Länger' };
+  info.innerHTML = `
+    <input type="text" id="edit-menge-${id}" value="${menge}" style="font-size:13px;padding:5px 8px;margin-bottom:4px" />
+    <div style="display:flex;gap:4px;margin-top:4px">
+      ${['soon','week','later'].map(u => `
+        <button onclick="saveEditItem(${id},'${u}')" style="flex:1;font-size:10px;padding:4px 2px;border-radius:6px;border:1.5px solid ${u===urgency?'var(--green)':'var(--border)'};background:${u===urgency?'var(--green-pale)':'transparent'};cursor:pointer;font-family:DM Sans,sans-serif">
+          ${urgencyLabels[u]}
+        </button>`).join('')}
+    </div>`;
+}
+
+async function saveEditItem(id, newUrgency) {
+  const mengeEl = document.getElementById('edit-menge-' + id);
+  const newMenge = mengeEl ? mengeEl.value.trim() : '';
+  if (!newMenge) return;
+  await fetch('/inventar/' + id, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ menge: newMenge, urgency: newUrgency })
+  });
+  const item = inventory.find(i => i.id === id);
+  if (item) { item.menge = newMenge; item.urgency = newUrgency; }
+  renderInventory();
 }
 
 function toggleGroup(key) {
@@ -862,8 +892,8 @@ async function saveRezeptFromGenerated(r, btn) {
 
 // Meal Plan
 async function generateMealPlan() {
-  const tage = parseInt(document.getElementById('plan-tage').value);
-  const mahlzeiten = parseInt(document.getElementById('plan-mahlzeiten').value);
+  const tage = parseInt(document.getElementById('plan-tage').value) || 3;
+  const mahlzeiten = parseInt(document.getElementById('plan-mahlzeiten').value) || 2;
   const budget = parseFloat(document.getElementById('plan-budget').value) || 0;
   const total = tage * mahlzeiten;
 
