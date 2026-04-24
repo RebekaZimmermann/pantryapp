@@ -804,7 +804,7 @@ function renderMealPlan(data) {
         </div>
         <div class="plan-titel">${m.titel}</div>
         <div class="plan-desc">${m.beschreibung || ''}</div>
-        <div class="plan-zutaten">${(m.zutaten || []).map(z => z.name).join(' · ')}</div>
+        <div class="plan-zutaten">${(m.zutaten || []).map(z => z.menge ? `${z.name} (${z.menge})` : z.name).join(' · ')}</div>
         <div class="plan-zubereitung" id="zub-${rezeptId}">${m.zubereitung || ''}</div>
         <div class="plan-actions">
           ${m.zubereitung ? `<button class="btn-small" id="zubbtn-${rezeptId}" onclick="toggleZubereitung('${rezeptId}')">▼ Zubereitung</button>` : ''}
@@ -827,7 +827,7 @@ function renderMealPlan(data) {
         <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
           <div style="flex:1">
             <div class="extra-name">${z.name} <span style="font-size:12px;color:var(--muted);font-weight:400">· ${z.menge || ''}</span></div>
-            <div class="extra-grund">${z.grund || ''}</div>
+            <div class="extra-grund">${z.rezept ? `<span style="color:var(--green);font-weight:500">→ ${z.rezept}</span> · ` : ''}${z.grund || ''}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
             <div class="extra-preis">${preis ? preis.toFixed(2) + ' €' : '–'}</div>

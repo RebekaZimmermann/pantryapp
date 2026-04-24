@@ -365,15 +365,16 @@ def mealplan():
                 zm = zutat.get('menge', '').lower()
                 for inv_item in list(virtual_inventory):
                     if inv_item['name'].lower() == zn:
-                        if any(w in zm for w in ['ganz', 'alles', 'alle', 'komplett']):
+                        if any(w in zm for w in ['ganz', 'alles', 'alle', 'komplett', 'gesamt']):
                             virtual_inventory.remove(inv_item)
                             if inv_item['name'] in soon_names:
                                 soon_names.remove(inv_item['name'])
-                        elif any(w in zm for w in ['haelfte', 'halb']):
-                            inv_item['menge'] = 'Haelfte noch'
+                        elif any(w in zm for w in ['hälfte', 'halb', 'haelfte']):
+                            inv_item['menge'] = 'ca. Hälfte noch'
                             inv_item['urgency'] = 'soon'
                         else:
-                            inv_item['menge'] = 'wenig uebrig'
+                            # Standardmäßig: Zutat als größtenteils verbraucht markieren
+                            inv_item['menge'] = 'wenig übrig'
                             inv_item['urgency'] = 'soon'
                         break
         except Exception as e:
@@ -381,9 +382,9 @@ def mealplan():
 
     # Einkaufsliste & Extra-Zutaten
     all_items_text = ', '.join([f"{i.menge} {i.name}" for i in items])
-    plan_zutaten_text = '\n'.join([f"- {m['titel']}: {', '.join([z['name'] for z in m.get('zutaten',[])])}" for m in plan])
+    plan_zutaten_text = '\n'.join([f"- {m['titel']} (Tag {m['tag']}, {m['mahlzeit']}): {', '.join([z['name'] + ' (' + z.get('menge','') + ')' for z in m.get('zutaten',[])])}" for m in plan])
     fehlende_namen = ', '.join(set([z['name'] for m in plan for z in m.get('zutaten', []) if z['name'].lower() not in [i.name.lower() for i in items]]))
-    budget_text = f"Budget fuer Einkauf: {budget:.2f} EUR" if budget > 0 else "Kein Budget festgelegt"
+    budget_text = f"Budget für Einkauf: {budget:.2f} EUR" if budget > 0 else "Kein Budget festgelegt"
 
     einkaufsliste = {}
     extra_zutaten = []
@@ -396,21 +397,26 @@ def mealplan():
                 {"role": "system", "content": """Du bist Einkaufsplaner für Deutschland (REWE). Antworte NUR mit validem JSON.
 REGELN:
 - einkaufsliste: NUR Zutaten die im Plan benötigt aber NICHT im Inventar sind (typ: fehlend)
-- extra_zutaten: optionale Verbesserungen die WEDER im Inventar NOCH auf der Einkaufsliste sind
+- extra_zutaten: optionale Zutaten die ein KONKRETES geplantes Rezept deutlich aufwerten würden - NIEMALS allgemeine Vorschläge
+- Jede extra_zutat MUSS einen "rezept" Feldwert haben der den exakten Rezepttitel nennt den sie aufwertet
 - extra_zutaten kommen NICHT automatisch auf die Einkaufsliste
-- Grundzutaten wie Wasser, Salz, Pfeffer, Öl NIEMALS auf die Einkaufsliste oder als Extra vorschlagen
-- Verwende korrekte deutsche Umlaute (ä, ö, ü) in allen Texten
+- Grundzutaten wie Wasser, Salz, Pfeffer, Öl, Zucker NIEMALS vorschlagen
+- Verwende korrekte deutsche Umlaute (ä, ö, ü)
 - Realistische REWE-Preise
-Format: {"extra_zutaten":[{"name":"X","menge":"Y","preis_ca":1.20,"grund":"Z","kategorie":"Obst & Gemüse"}],"einkaufsliste":{"Obst & Gemüse":[{"name":"X","menge":"Y","preis_ca":1.20,"typ":"fehlend"}],"Kühlregal":[],"Tiefkühl":[],"Brot & Backwaren":[],"Trockenwaren & Konserven":[],"Getränke":[],"Sonstiges":[]},"budget_verwendet":5.00,"budget_gesamt":20.00}"""},
-                {"role": "user", "content": f"""Inventar (vorhanden): {all_items_text}
-Plan: {plan_zutaten_text}
+Format: {"extra_zutaten":[{"name":"Parmesan","menge":"1 Stück","preis_ca":2.49,"grund":"Macht die Pasta cremiger","rezept":"Pasta mit Tomaten","kategorie":"Kühlregal"}],"einkaufsliste":{"Obst & Gemüse":[{"name":"X","menge":"Y","preis_ca":1.20,"typ":"fehlend"}],"Kühlregal":[],"Tiefkühl":[],"Brot & Backwaren":[],"Trockenwaren & Konserven":[],"Getränke":[],"Sonstiges":[]},"budget_verwendet":5.00,"budget_gesamt":20.00}"""},
+                {"role": "user", "content": f"""Inventar (vorhanden, NICHT auf Liste): {all_items_text}
+
+Geplante Mahlzeiten mit Zutaten und Mengen:
+{plan_zutaten_text}
+
 Fehlende Zutaten (bereits auf Liste, NICHT als Extra): {fehlende_namen}
 {budget_text}
-1. Fehlende Zutaten auf Einkaufsliste (typ: fehlend) - KEIN Wasser, Salz, Pfeffer, Öl
-2. 2-3 Extra-Vorschläge die NICHT fehlend und NICHT im Inventar sind - KEIN Wasser, Salz, Pfeffer, Öl
-3. Budget beachten
-4. Realistische REWE-Preise
-5. Korrekte deutsche Umlaute verwenden"""}
+
+Aufgaben:
+1. Einkaufsliste: NUR Zutaten die im Plan benötigt aber NICHT im Inventar sind (kein Wasser/Salz/Pfeffer/Öl)
+2. Extra-Vorschläge: 2-3 Zutaten die ein KONKRETES geplantes Rezept aufwerten - mit exaktem Rezeptnamen im Feld "rezept"
+3. Budget beachten, fehlende Zutaten haben Priorität
+4. Realistische REWE-Preise, korrekte Umlaute"""}
             ]
         )
         text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
