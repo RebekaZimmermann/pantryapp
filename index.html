@@ -90,8 +90,14 @@
   .api-row { display: flex; gap: 8px; }
   .api-row input { flex: 1; font-size: 13px; padding: 8px 10px; border: 1px solid #F59E0B; border-radius: 7px; background: white; font-family: 'DM Sans', sans-serif; outline: none; }
   .api-saved { font-size: 11px; color: #166534; margin-top: 5px; }
-  .plan-card { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+  .plan-card { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; cursor: grab; transition: box-shadow 0.15s, opacity 0.15s; }
+  .plan-card:active { cursor: grabbing; }
   .plan-card.gespeichert { border-color: #C5BEFA; background: #FAF9FF; }
+  .plan-card.dragging { opacity: 0.4; box-shadow: none; }
+  .plan-card.drag-over { box-shadow: 0 0 0 2px var(--green); }
+  .drag-handle { color: var(--muted); font-size: 14px; margin-right: 8px; cursor: grab; user-select: none; }
+  .day-drop-zone { min-height: 40px; border-radius: 8px; transition: background 0.15s; }
+  .day-drop-zone.drag-over-zone { background: var(--green-pale); }
   .plan-mahlzeit { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
   .plan-titel { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 500; margin-bottom: 4px; }
   .plan-desc { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
@@ -343,6 +349,10 @@ let einkaufItemCount = 0;
 let currentExtraZutaten = [];
 let currentParsedRezept = null;
 let meineRezepte = [];
+let planCardIndex = 0;
+let planCards = {};
+let dragSrcIdx = null;
+let currentPlanData = null;
 
 async function init() {
   await loadInventar();
@@ -778,12 +788,15 @@ async function savePlanRezept(rezept, btnId) {
 }
 
 function renderMealPlan(data) {
+  currentPlanData = data;
   const { plan, tage, einkaufsliste, extra_zutaten, budget, budget_verwendet } = data;
   const days = ['Mo','Di','Mi','Do','Fr','Sa','So'];
   const today = new Date().getDay();
   checkedItems = new Set();
   einkaufItemCount = 0;
   currentExtraZutaten = extra_zutaten || [];
+  planCardIndex = 0;
+  planCards = {};
   let html = '';
 
   html += '<div class="section-label">Dein Wochenplan</div>';
@@ -791,16 +804,34 @@ function renderMealPlan(data) {
     const mahlzeiten = plan[t] || [];
     const dayLabel = days[(today + t - 2) % 7];
     html += `<div class="day-header">Tag ${t} · ${dayLabel}</div>`;
+    html += `<div class="day-drop-zone" id="dropzone-${t}" data-tag="${t}" ondragover="onDragOverZone(event,${t})" ondragleave="onDragLeaveZone(${t})" ondrop="onDropZone(event,${t})">`;
     for (const m of mahlzeiten) {
       const urgentCount = (m.zutaten || []).filter(z => z.urgency === 'soon').length;
       const rezeptId = `plan-${t}-${m.mahlzeit.replace(/\s/g,'')}`;
       const saveId = `savebtn-${rezeptId}`;
       const isGespeichert = m.quelle === 'gespeichert';
       const rezeptData = JSON.stringify(m).replace(/'/g,"&#39;").replace(/"/g,'&quot;');
-      html += `<div class="plan-card${isGespeichert ? ' gespeichert' : ''}">
+      const cardIdx = planCardIndex++;
+      html += `<div class="plan-card${isGespeichert ? ' gespeichert' : ''}" 
+        id="card-${cardIdx}" 
+        data-idx="${cardIdx}"
+        data-tag="${t}"
+        data-mahlzeit="${m.mahlzeit}"
+        draggable="true"
+        ondragstart="onDragStart(event,${cardIdx})"
+        ondragend="onDragEnd(event)"
+        ondragover="onDragOver(event)"
+        ondrop="onDrop(event,${cardIdx})">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="plan-mahlzeit">${m.mahlzeit}${isGespeichert ? ' · <span style="color:#4C3DB5;font-size:10px">📖 Gespeichert</span>' : ''}</div>
-          ${urgentCount > 0 ? `<span style="font-size:10px;background:var(--orange-pale);color:var(--orange);padding:2px 6px;border-radius:10px;font-weight:500">🔴 ${urgentCount} dringend</span>` : ''}
+          <div style="display:flex;align-items:center">
+            <span class="drag-handle" title="Verschieben">⠿</span>
+            <div class="plan-mahlzeit">${m.mahlzeit}${isGespeichert ? ' · <span style="color:#4C3DB5;font-size:10px">📖 Gespeichert</span>' : ''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            ${urgentCount > 0 ? `<span style="font-size:10px;background:var(--orange-pale);color:var(--orange);padding:2px 6px;border-radius:10px;font-weight:500">🔴 ${urgentCount}</span>` : ''}
+            <button class="btn-icon" title="Neu generieren" onclick="regenMeal(${cardIdx})" style="font-size:11px">↺</button>
+            <button class="btn-icon" title="Löschen" onclick="deleteMeal(${cardIdx})" style="font-size:11px">✕</button>
+          </div>
         </div>
         <div class="plan-titel">${m.titel}</div>
         <div class="plan-desc">${m.beschreibung || ''}</div>
@@ -811,7 +842,9 @@ function renderMealPlan(data) {
           <button class="btn-small" id="${saveId}" onclick="savePlanRezept(${rezeptData}, '${saveId}')">🔖 Speichern</button>
         </div>
       </div>`;
+      planCards[cardIdx] = { ...m, tag: t };
     }
+    html += '</div>'; // close dropzone
   }
 
   if (extra_zutaten && extra_zutaten.length > 0) {
@@ -1020,6 +1053,165 @@ async function saveApiKey() {
   await fetch('/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ openai_key: key }) });
   document.getElementById('api-saved').textContent = '✓ API Key gespeichert';
   document.getElementById('api-key-input').value = '';
+}
+
+// --- Drag & Drop ---
+function onDragStart(e, idx) {
+  dragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', idx);
+  setTimeout(() => document.getElementById('card-' + idx)?.classList.add('dragging'), 0);
+}
+
+function onDragEnd(e) {
+  document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('dragging', 'drag-over'));
+  document.querySelectorAll('.day-drop-zone').forEach(z => z.classList.remove('drag-over-zone'));
+  dragSrcIdx = null;
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onDrop(e, targetIdx) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.remove('drag-over');
+  if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
+  swapCards(dragSrcIdx, targetIdx);
+}
+
+function onDragOverZone(e, tag) {
+  e.preventDefault();
+  document.getElementById('dropzone-' + tag)?.classList.add('drag-over-zone');
+}
+
+function onDragLeaveZone(tag) {
+  document.getElementById('dropzone-' + tag)?.classList.remove('drag-over-zone');
+}
+
+function onDropZone(e, tag) {
+  e.preventDefault();
+  document.getElementById('dropzone-' + tag)?.classList.remove('drag-over-zone');
+  if (dragSrcIdx === null) return;
+  const srcCard = document.getElementById('card-' + dragSrcIdx);
+  if (!srcCard) return;
+  const zone = document.getElementById('dropzone-' + tag);
+  if (!zone) return;
+  // Karte in neue Drop-Zone verschieben
+  zone.appendChild(srcCard);
+  srcCard.dataset.tag = tag;
+  planCards[dragSrcIdx].tag = tag;
+  // Tag-Label in der Karte aktualisieren
+  const mahlzeit = planCards[dragSrcIdx].mahlzeit;
+  const mahlzeitEl = srcCard.querySelector('.plan-mahlzeit');
+  if (mahlzeitEl) mahlzeitEl.dataset.tag = tag;
+  dragSrcIdx = null;
+}
+
+function swapCards(idxA, idxB) {
+  const cardA = document.getElementById('card-' + idxA);
+  const cardB = document.getElementById('card-' + idxB);
+  if (!cardA || !cardB) return;
+  const parentA = cardA.parentNode;
+  const parentB = cardB.parentNode;
+  const nextA = cardA.nextSibling;
+  const nextB = cardB.nextSibling;
+  if (parentA === parentB) {
+    parentA.insertBefore(cardB, nextA === cardB ? cardA : nextA);
+    parentB.insertBefore(cardA, nextB);
+  } else {
+    parentA.insertBefore(cardB, nextA);
+    parentB.insertBefore(cardA, nextB);
+  }
+  // State tauschen
+  const tagA = planCards[idxA].tag;
+  const tagB = planCards[idxB].tag;
+  planCards[idxA].tag = tagB;
+  planCards[idxB].tag = tagA;
+  cardA.dataset.tag = tagB;
+  cardB.dataset.tag = tagA;
+}
+
+function deleteMeal(idx) {
+  const card = document.getElementById('card-' + idx);
+  if (card) { card.style.opacity = '0'; card.style.transition = 'opacity 0.2s'; setTimeout(() => card.remove(), 200); }
+  delete planCards[idx];
+}
+
+async function regenMeal(idx) {
+  if (!currentPlanData) return;
+  const card = document.getElementById('card-' + idx);
+  if (!card) return;
+
+  const mahlzeit = card.dataset.mahlzeit;
+  const tag = parseInt(card.dataset.tag);
+
+  // Loading anzeigen
+  card.style.opacity = '0.5';
+  const titleEl = card.querySelector('.plan-titel');
+  const origTitle = titleEl?.textContent;
+  if (titleEl) titleEl.textContent = '⏳ Wird neu generiert...';
+
+  // Aktuelles Inventar als Text
+  const soonItems = inventory.filter(i => i.urgency === 'soon');
+  const weekItems = inventory.filter(i => i.urgency === 'week');
+  const laterItems = inventory.filter(i => i.urgency === 'later');
+  const inventoryText = [
+    soonItems.length > 0 ? 'DRINGEND: ' + soonItems.map(i => i.menge + ' ' + i.name).join(', ') : '',
+    weekItems.length > 0 ? 'Diese Woche: ' + weekItems.map(i => i.menge + ' ' + i.name).join(', ') : '',
+    laterItems.length > 0 ? 'Länger haltbar: ' + laterItems.map(i => i.menge + ' ' + i.name).join(', ') : ''
+  ].filter(Boolean).join('\n');
+
+  // Bereits geplante Titel (außer dieser Karte)
+  const alreadyPlanned = Object.values(planCards).filter(c => c !== planCards[idx]).map(c => c.titel).join(', ');
+
+  try {
+    const res = await fetch('/rezepte', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inventory_text: inventoryText + `\n\nBereits geplant (nicht wiederholen): ${alreadyPlanned}\nMahlzeit: Tag ${tag}, ${mahlzeit}` })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const newRezept = data.recipes[0];
+    newRezept.tag = tag;
+    newRezept.mahlzeit = mahlzeit;
+    newRezept.quelle = 'ki';
+    planCards[idx] = newRezept;
+
+    // Card DOM updaten
+    const rezeptId = `plan-${tag}-${mahlzeit.replace(/\s/g,'')}`;
+    const saveId = `savebtn-${rezeptId}-regen`;
+    const rezeptData = JSON.stringify(newRezept).replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+    const urgentCount = (newRezept.zutaten || []).filter(z => z.urgency === 'soon').length;
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center">
+          <span class="drag-handle">⠿</span>
+          <div class="plan-mahlzeit">${mahlzeit}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          ${urgentCount > 0 ? `<span style="font-size:10px;background:var(--orange-pale);color:var(--orange);padding:2px 6px;border-radius:10px;font-weight:500">🔴 ${urgentCount}</span>` : ''}
+          <button class="btn-icon" onclick="regenMeal(${idx})" style="font-size:11px">↺</button>
+          <button class="btn-icon" onclick="deleteMeal(${idx})" style="font-size:11px">✕</button>
+        </div>
+      </div>
+      <div class="plan-titel">${newRezept.titel}</div>
+      <div class="plan-desc">${newRezept.beschreibung || ''}</div>
+      <div class="plan-zutaten">${(newRezept.zutaten || []).map(z => z.menge ? `${z.name} (${z.menge})` : z.name).join(' · ')}</div>
+      <div class="plan-zubereitung" id="zub-regen-${idx}" style="display:none">${newRezept.zubereitung || ''}</div>
+      <div class="plan-actions">
+        ${newRezept.zubereitung ? `<button class="btn-small" onclick="toggleZubereitung('regen-${idx}')">▼ Zubereitung</button>` : ''}
+        <button class="btn-small" id="${saveId}" onclick="savePlanRezept(${rezeptData}, '${saveId}')">🔖 Speichern</button>
+      </div>`;
+    card.style.opacity = '1';
+  } catch(e) {
+    if (titleEl) titleEl.textContent = origTitle;
+    card.style.opacity = '1';
+    alert('Fehler beim Neu-generieren: ' + e.message);
+  }
 }
 
 init();
