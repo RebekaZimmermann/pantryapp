@@ -978,7 +978,10 @@ function renderMealPlan(data) {
         </div>
         <div class="plan-titel">${m.titel}</div>
         <div class="plan-desc">${m.beschreibung || ''}</div>
-        <div class="plan-zutaten">${(m.zutaten || []).map(z => z.menge ? `${z.name} (${z.menge})` : z.name).join(' · ')}</div>
+        <div class="plan-zutaten">${(m.zutaten || []).map(z => {
+          const menge = (z.menge || '').replace(/^(wenig übrig|ca\. Hälfte noch|wenig uebrig|Haelfte noch)\s*/i, '').trim();
+          return menge ? `${z.name} (${menge})` : z.name;
+        }).join(' · ')}</div>
         <div class="plan-zubereitung" id="zub-${rezeptId}">${m.zubereitung || ''}</div>
         <div class="plan-actions">
           ${m.zubereitung ? `<button class="btn-small" id="zubbtn-${rezeptId}" onclick="toggleZubereitung('${rezeptId}')">▼ Zubereitung</button>` : ''}

@@ -639,9 +639,12 @@ Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","zutaten":[{{"nam
                 response = client.chat.completions.create(
                     model='gpt-4o', max_tokens=400,
                     messages=[
-                        {"role": "system", "content": f"""Gesunder Snack für 1 Person. ERNÄHRUNG: {ernaehrung_text}. {mag_nicht_text}
-NUR JSON: {{"titel":"Name","zeit":"5 Min","beschreibung":"Kurz","zutaten":[{{"name":"Apfel","menge":"1","kaufen":true}}],"zubereitung":"Kurz"}}"""},
-                        {"role": "user", "content": f"Inventar: {inv_rest}\n{snack_budget_info}\nBisherige Snacks (nicht wiederholen): {', '.join(already_snacks)}\nSnack für Tag {tag}."}
+                        {"role": "system", "content": f"""Gesunder, einfacher Snack für 1 Person in Deutschland. ERNÄHRUNG: {ernaehrung_text}. {mag_nicht_text}
+Nur bekannte, realistische Snacks ohne seltsame Kombinationen.
+Gute Beispiele: Apfel, Banane, Handvoll Nüsse, Naturjoghurt mit Beeren, Möhren mit Hummus, Reiswaffeln mit Frischkäse, Quark mit Obst.
+Schlechte Beispiele (NIEMALS): Joghurt-Parmesan-Dip, Käse-Obst-Kombis, ungewöhnliche Mischungen.
+NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"name":"Apfel","menge":"1 Stück","kaufen":true}}],"zubereitung":"Kurz"}}"""},
+                        {"role": "user", "content": f"Inventar: {inv_rest}\n{snack_budget_info}\nBisherige Snacks (nicht wiederholen): {', '.join(already_snacks)}\nSnack für Tag {tag}. Einfach und alltagstauglich."}
                     ]
                 )
                 text = response.choices[0].message.content.replace('```json','').replace('```','').strip()
