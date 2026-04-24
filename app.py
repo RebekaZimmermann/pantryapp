@@ -37,19 +37,24 @@ class GespeichertesRezept(db.Model):
     zutaten_json = db.Column(db.Text, nullable=False)
     zubereitung = db.Column(db.Text, nullable=True)
     quelle = db.Column(db.String(50), default='manuell')
+    kategorien = db.Column(db.Text, default='[]')
     gespeichert_am = db.Column(db.DateTime, default=datetime.utcnow)
 
 class UserSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ernaehrung = db.Column(db.String(50), default='alles')
-    cuisines = db.Column(db.Text, default='[]')          # JSON Liste: ['italienisch','asiatisch',...]
-    schwierigkeit = db.Column(db.String(20), default='mittel')  # einfach, mittel, anspruchsvoll
-    tools = db.Column(db.Text, default='[]')             # JSON Liste: ['mixer','stabmixer',...]
-    mag_nicht = db.Column(db.Text, default='')           # Kommagetrennte Liste
-    mag = db.Column(db.Text, default='')                 # Kommagetrennte Liste
+    cuisines = db.Column(db.Text, default='[]')
+    schwierigkeit = db.Column(db.String(20), default='mittel')
+    tools = db.Column(db.Text, default='[]')
+    mag_nicht = db.Column(db.Text, default='')
+    mag = db.Column(db.Text, default='')
     snacks_aktiv = db.Column(db.Boolean, default=False)
-    snack_budget_typ = db.Column(db.String(20), default='im_budget')  # im_budget, eigenes, kein_tracking
+    snack_budget_typ = db.Column(db.String(20), default='im_budget')
     snack_budget = db.Column(db.Float, default=0.0)
+    ziel_kalorien = db.Column(db.Integer, default=0)
+    ziel_protein = db.Column(db.Integer, default=0)
+    ziel_kohlenhydrate = db.Column(db.Integer, default=0)
+    ziel_fett = db.Column(db.Integer, default=0)
 
 with app.app_context():
     db.create_all()
@@ -145,6 +150,21 @@ def delete_mein_rezept(rezept_id):
     db.session.commit()
     return jsonify({'ok': True})
 
+@app.route('/meine-rezepte/<int:rezept_id>/kategorien', methods=['POST'])
+def update_kategorien(rezept_id):
+    r = GespeichertesRezept.query.get_or_404(rezept_id)
+    r.kategorien = json.dumps(request.json.get('kategorien', []))
+    db.session.commit()
+    return jsonify({'ok': True})
+
+# --- Historie löschen ---
+@app.route('/historie/<int:rezept_id>', methods=['DELETE'])
+def delete_historie(rezept_id):
+    r = GekochteRezept.query.get_or_404(rezept_id)
+    db.session.delete(r)
+    db.session.commit()
+    return jsonify({'ok': True})
+
 # --- User Settings ---
 @app.route('/user-settings', methods=['GET'])
 def get_user_settings():
@@ -153,7 +173,8 @@ def get_user_settings():
         return jsonify({
             'ernaehrung': 'alles', 'cuisines': [], 'schwierigkeit': 'mittel',
             'tools': [], 'mag_nicht': '', 'mag': '',
-            'snacks_aktiv': False, 'snack_budget_typ': 'im_budget', 'snack_budget': 0.0
+            'snacks_aktiv': False, 'snack_budget_typ': 'im_budget', 'snack_budget': 0.0,
+            'ziel_kalorien': 0, 'ziel_protein': 0, 'ziel_kohlenhydrate': 0, 'ziel_fett': 0
         })
     return jsonify({
         'ernaehrung': s.ernaehrung,
@@ -164,7 +185,11 @@ def get_user_settings():
         'mag': s.mag or '',
         'snacks_aktiv': s.snacks_aktiv,
         'snack_budget_typ': s.snack_budget_typ,
-        'snack_budget': s.snack_budget
+        'snack_budget': s.snack_budget,
+        'ziel_kalorien': s.ziel_kalorien or 0,
+        'ziel_protein': s.ziel_protein or 0,
+        'ziel_kohlenhydrate': s.ziel_kohlenhydrate or 0,
+        'ziel_fett': s.ziel_fett or 0
     })
 
 @app.route('/user-settings', methods=['POST'])
@@ -183,6 +208,10 @@ def save_user_settings():
     s.snacks_aktiv = data.get('snacks_aktiv', False)
     s.snack_budget_typ = data.get('snack_budget_typ', 'im_budget')
     s.snack_budget = float(data.get('snack_budget', 0))
+    s.ziel_kalorien = int(data.get('ziel_kalorien', 0))
+    s.ziel_protein = int(data.get('ziel_protein', 0))
+    s.ziel_kohlenhydrate = int(data.get('ziel_kohlenhydrate', 0))
+    s.ziel_fett = int(data.get('ziel_fett', 0))
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -360,6 +389,7 @@ def mealplan():
     budget = float(data.get('budget', 0))
     gespeicherte_ids = data.get('gespeicherte_rezepte', [])
     meal_prep = data.get('meal_prep', False)
+    start_mahlzeit = data.get('start_mahlzeit', 'Mittagessen')  # erste Mahlzeit des ersten Tags
     total = tage * mahlzeiten_pro_tag
 
     # Alle User Settings laden
@@ -373,6 +403,10 @@ def mealplan():
     snacks_aktiv = user_settings.snacks_aktiv if user_settings else False
     snack_budget_typ = user_settings.snack_budget_typ if user_settings else 'im_budget'
     snack_budget_val = user_settings.snack_budget if user_settings else 0.0
+    ziel_kalorien = (user_settings.ziel_kalorien or 0) if user_settings else 0
+    ziel_protein = (user_settings.ziel_protein or 0) if user_settings else 0
+    ziel_kohlenhydrate = (user_settings.ziel_kohlenhydrate or 0) if user_settings else 0
+    ziel_fett = (user_settings.ziel_fett or 0) if user_settings else 0
 
     ernaehrung_map = {
         'alles': 'keine Einschränkungen',
@@ -394,6 +428,26 @@ def mealplan():
     tools_text = f"Verfügbare Küchengeräte: {', '.join(tools)}" if tools else ""
     mag_nicht_text = f"Mag NICHT (niemals verwenden): {mag_nicht}" if mag_nicht.strip() else ""
     mag_text = f"Mag besonders gerne: {mag}" if mag.strip() else ""
+
+    # Macro-Ziele für Prompt
+    macro_text = ""
+    if ziel_kalorien or ziel_protein or ziel_kohlenhydrate or ziel_fett:
+        macro_parts = []
+        if ziel_kalorien: macro_parts.append(f"{ziel_kalorien} kcal")
+        if ziel_protein: macro_parts.append(f"{ziel_protein}g Protein")
+        if ziel_kohlenhydrate: macro_parts.append(f"{ziel_kohlenhydrate}g Kohlenhydrate")
+        if ziel_fett: macro_parts.append(f"{ziel_fett}g Fett")
+        mahlzeiten_faktor = mahlzeiten_pro_tag if mahlzeiten_pro_tag > 0 else 2
+        macro_text = f"Macro-Ziele pro TAG: {', '.join(macro_parts)} – verteile dies auf {mahlzeiten_faktor} Mahlzeiten"
+
+    # Budget-Check: realistisch?
+    budget_warnung = ""
+    if budget > 0:
+        budget_pro_tag = budget / tage
+        if budget_pro_tag < 3:
+            budget_warnung = f"BUDGET_WARNUNG: {budget:.2f}€ für {tage} Tage ist sehr knapp (ca. {budget_pro_tag:.2f}€/Tag). Die App wird versuchen es einzuhalten, aber es kann schwierig sein."
+        elif budget_pro_tag < 5:
+            budget_warnung = f"Budget ist moderat ({budget_pro_tag:.2f}€/Tag) – einfache, günstige Zutaten bevorzugen."
 
     items = InventarItem.query.all()
     if not items:
@@ -523,44 +577,50 @@ ERNÄHRUNG: {ernaehrung_text}
 {extra_constraints}
 Generiere GENAU 1 Snack-Vorschlag als JSON.
 - Gesund, sättigend, einfach zuzubereiten
-- Kein Kochen nötig oder max. 10 Min
-- Korrekte deutsche Umlaute
-- NUR JSON
-Format: {{"titel":"Name","zeit":"5 Min","beschreibung":"Kurz","zutaten":[{{"name":"Apfel","menge":"1 Stück","kaufen":true}}],"zubereitung":"Kurze Zubereitung"}}"""},
+- Wenn möglich Obst einbauen (Apfel, Banane, Beeren, etc.)
+- Nur bekannte, alltagstaugliche Snacks – keine seltsamen Kombinationen
+- Kein Kochen nödig oder max. 5 Min
+- Korrekte deutsche Umlaute, NUR JSON
+Format: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"name":"Apfel","menge":"1 Stück","kaufen":true}}],"zubereitung":"Kurz","naehrstoffe":{{"kalorien":150,"protein":3,"kohlenhydrate":25,"fett":2}}}}"""},
                             {"role": "user", "content": f"""Inventar (kostenlos): {inv_rest}
 {snack_budget_info}
 Bereits heute geplant: {todays_titles}
-Snack für Tag {tag}. Gesund und abwechslungsreich."""}
+Snack für Tag {tag}. Einfach, gesund, mit Obst wenn möglich."""}
                         ]
                     )
                 else:
+                    # Meal Prep Hinweis – Abendessen braucht doppelte Menge
+                    meal_prep_hinweis = ""
+                    if meal_prep and mahlzeit_label == 'Abendessen':
+                        meal_prep_hinweis = "\nMEAL PREP: Dieses Abendessen wird auch als Mittagessen für den nächsten Tag verwendet. Mengenangaben für 2 Portionen angeben (doppelte Menge)."
                     response = client.chat.completions.create(
-                        model='gpt-4o', max_tokens=800,
+                        model='gpt-4o', max_tokens=900,
                         messages=[
                             {"role": "system", "content": f"""Du planst Mahlzeiten für eine einzelne Person in Deutschland.
 Generiere GENAU 1 Rezept als JSON.
 ERNÄHRUNG: {ernaehrung_text} – STRIKT einhalten.
 SCHWIERIGKEIT: {schwierigkeit_text}
-KÜCHEN: {cuisines_text} – wechsle zwischen den bevorzugten Küchen ab.
+KÜCHEN: {cuisines_text} – wechsle ab.
 {extra_constraints}
+{macro_text}
 REGELN:
 - Du darfst ALLE Zutaten verwenden
 - Jede Mahlzeit MUSS enthalten: Protein + Gemüse + Kohlenhydrate
 - Jede Mahlzeit soll eine ANDERE Küche repräsentieren als bereits geplant
 - Nie dieselbe Proteinquelle oder Gemüsesorte zweimal hintereinander
-- Realistische, leckere Alltagsgerichte für 1 Person
-- Budget pro Mahlzeit einhalten
-- Korrekte deutsche Umlaute
-- NUR JSON
-Format: {{"titel":"Name","zeit":"25 Min","beschreibung":"Kurze appetitliche Beschreibung","kueche":"italienisch","zutaten":[{{"name":"Hähnchenbrust","menge":"1 Stück (ca. 200g)","kaufen":true}},{{"name":"Brokkoli","menge":"1 kleiner Kopf","kaufen":true}},{{"name":"Nudeln","menge":"100g","kaufen":false}}],"zubereitung":"Schritt 1: ...","naehrstoffe":{{"protein":"Hähnchen","gemuese":"Brokkoli","kohlenhydrate":"Nudeln"}}}}
+- Realistische Alltagsgerichte für 1 Person (außer bei Meal Prep: dann 2 Portionen)
+- Budget STRIKT einhalten – wenn Budget knapp ist, günstigere Zutaten wählen
+- Einkaufsmengen realistisch: ganze Packungen/Einheiten angeben (z.B. "1 Packung Nudeln 500g", "1 Dose Tomaten 400g", "1 Glas Erdnussbutter" – nicht "200g Erdnussbutter")
+- Korrekte deutsche Umlaute, NUR JSON
+Format: {{"titel":"Name","zeit":"25 Min","beschreibung":"Beschreibung","kueche":"italienisch","zutaten":[{{"name":"Hähnchenbrust","menge":"1 Stück (ca. 200g)","kaufen":true}},{{"name":"Nudeln","menge":"1 Packung (500g)","kaufen":false}}],"zubereitung":"Schritt 1: ...","naehrstoffe":{{"kalorien":550,"protein":35,"kohlenhydrate":60,"fett":15}}}}
 Setze "kaufen":true für neue Zutaten, "kaufen":false für Inventar-Zutaten."""},
-                            {"role": "user", "content": f"""Noch im Inventar (kostenlos nutzbar): {inv_rest}
+                            {"role": "user", "content": f"""Inventar (kostenlos): {inv_rest}
 Budget pro Mahlzeit: {f'ca. {budget_pro_mahlzeit:.2f} €' if budget_pro_mahlzeit > 0 else 'günstig kochen'}
 Heute bereits geplant: {todays_titles}
-Alle geplanten Gerichte bisher (nicht wiederholen): {already_planned}
-Mahlzeit: Tag {tag} von {tage}, {mahlzeit_label}
+Alle geplanten Gerichte (nicht wiederholen): {already_planned}
+Mahlzeit: Tag {tag} von {tage}, {mahlzeit_label}{meal_prep_hinweis}
 
-WICHTIG: Wähle eine Küche die noch NICHT vertreten ist. Andere Proteinquelle, andere Gemüse als bisher."""}
+Wähle eine noch nicht vertretene Küche. Andere Proteinquelle, andere Gemüse als bisher."""}
                         ]
                     )
             else:
@@ -715,7 +775,12 @@ Aufgaben:
     return jsonify({
         'plan': grouped, 'tage': tage, 'mahlzeiten': mahlzeiten_pro_tag,
         'einkaufsliste': einkaufsliste, 'extra_zutaten': extra_zutaten,
-        'budget': budget, 'budget_verwendet': budget_verwendet
+        'budget': budget, 'budget_verwendet': budget_verwendet,
+        'budget_warnung': budget_warnung,
+        'alle_kaufen_zutaten': [
+            {'name': z['name'], 'menge': z.get('menge', ''), 'rezept': m['titel']}
+            for m in plan for z in m.get('zutaten', []) if z.get('kaufen', False)
+        ]
     })
 
 if __name__ == '__main__':
