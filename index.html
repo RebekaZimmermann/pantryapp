@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kühlschrank</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@300;500&family=DM+Sans:wght@300;400;500&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -224,7 +224,7 @@
 <script>
 let inventory = [], selectedUrgency = null, selectedProductUrgency = null;
 let currentRecipe = null, cookedSelections = {};
-let currentProductName = '', barcodeScanning = false, lastScannedCode = '';
+let currentProductName = '', lastScannedCode = '';
 
 // --- Init ---
 async function init() {
@@ -286,38 +286,47 @@ function renderInventory() {
 }
 
 // --- Barcode Scanner ---
-function openBarcodeScanner() {
+let codeReader = null;
+
+async function openBarcodeScanner() {
   document.getElementById('barcode-modal').style.display = 'flex';
-  barcodeScanning = true;
   lastScannedCode = '';
 
-  Quagga.init({
-    inputStream: {
-      name: 'Live',
-      type: 'LiveStream',
-      target: document.getElementById('barcode-viewport'),
-      constraints: { facingMode: 'environment', width: 300, height: 220 }
-    },
-    decoder: { readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader'] }
-  }, function(err) {
-    if (err) { alert('Kamera konnte nicht geöffnet werden: ' + err); closeBarcodeScanner(); return; }
-    Quagga.start();
-  });
+  try {
+    codeReader = new ZXing.BrowserMultiFormatReader();
+    const videoEl = document.createElement('video');
+    videoEl.style.width = '100%';
+    videoEl.style.height = '100%';
+    videoEl.style.objectFit = 'cover';
+    const viewport = document.getElementById('barcode-viewport');
+    // Scan-Linie erhalten
+    const scanLine = viewport.querySelector('.scan-line');
+    viewport.innerHTML = '';
+    viewport.appendChild(videoEl);
+    viewport.appendChild(scanLine);
 
-  Quagga.onDetected(async function(result) {
-    const code = result.codeResult.code;
-    if (code === lastScannedCode) return;
-    lastScannedCode = code;
-    Quagga.stop();
+    await codeReader.decodeFromConstraints(
+      { video: { facingMode: 'environment' } },
+      videoEl,
+      async (result, err) => {
+        if (result) {
+          const code = result.getText();
+          if (code === lastScannedCode) return;
+          lastScannedCode = code;
+          closeBarcodeScanner();
+          await lookupBarcode(code);
+        }
+      }
+    );
+  } catch(e) {
+    alert('Kamera konnte nicht geöffnet werden: ' + e.message);
     closeBarcodeScanner();
-    await lookupBarcode(code);
-  });
+  }
 }
 
 function closeBarcodeScanner() {
   document.getElementById('barcode-modal').style.display = 'none';
-  try { Quagga.stop(); } catch(e) {}
-  barcodeScanning = false;
+  if (codeReader) { try { codeReader.reset(); } catch(e) {} codeReader = null; }
 }
 
 async function lookupBarcode(code) {
