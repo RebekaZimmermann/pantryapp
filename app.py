@@ -389,6 +389,22 @@ def mealplan():
         else:
             mahlzeit_label = f'Mahlzeit {mahlzeit_nr}'
 
+        # Meal Prep: Mittagessen von Tag 2+ = Abendessen des Vortags
+        if meal_prep and mahlzeit_label == 'Mittagessen' and tag > 1:
+            prev_abendessen = next(
+                (m for m in plan if m.get('tag') == tag - 1 and m.get('mahlzeit') == 'Abendessen'),
+                None
+            )
+            if prev_abendessen:
+                plan.append({
+                    **prev_abendessen,
+                    'tag': tag,
+                    'mahlzeit': 'Mittagessen',
+                    'quelle': 'meal_prep',
+                    'meal_prep_von': prev_abendessen['titel']
+                })
+                continue
+
         soon = [x for x in virtual_inventory if x['urgency'] == 'soon']
         week = [x for x in virtual_inventory if x['urgency'] == 'week']
         later = [x for x in virtual_inventory if x['urgency'] == 'later']
@@ -517,25 +533,6 @@ Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","zutaten":[{{"nam
                         break
         except Exception as e:
             plan.append({'tag': tag, 'mahlzeit': mahlzeit_label, 'titel': 'Fehler', 'beschreibung': str(e), 'zutaten': [], 'zubereitung': '', 'quelle': 'ki'})
-
-    # Meal Prep: Abendessen als nächstes Mittagessen einplanen
-    if meal_prep and mahlzeiten_pro_tag >= 2:
-        plan_mit_prep = []
-        i = 0
-        while i < len(plan):
-            m = plan[i]
-            plan_mit_prep.append(m)
-            # Wenn Abendessen und nächster Tag hat Mittagessen
-            if m.get('mahlzeit') == 'Abendessen' and m.get('tag', 0) < tage:
-                next_tag = m['tag'] + 1
-                # Prüfen ob nächstes Mittagessen bereits vorhanden
-                has_next_mittag = any(p.get('tag') == next_tag and p.get('mahlzeit') == 'Mittagessen' for p in plan)
-                if not has_next_mittag:
-                    # Abendessen als Mittagessen für nächsten Tag einplanen
-                    prep_meal = {**m, 'tag': next_tag, 'mahlzeit': 'Mittagessen', 'quelle': 'meal_prep', 'meal_prep_von': m['titel']}
-                    plan_mit_prep.append(prep_meal)
-            i += 1
-        plan = plan_mit_prep
 
     # Einkaufsliste & Extra-Zutaten
     all_items_text = ', '.join([f"{i.menge} {i.name}" for i in items])
