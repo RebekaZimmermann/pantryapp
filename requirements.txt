@@ -1,5 +1,6 @@
-
 flask
 flask-cors
 openai
 gunicorn
+flask-sqlalchemy
+psycopg2-binary

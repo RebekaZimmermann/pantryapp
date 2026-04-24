@@ -18,7 +18,7 @@
   .header h1 { font-family: 'Fraunces', serif; font-weight: 300; font-size: 22px; color: var(--cream); }
   .header p { font-size: 12px; color: rgba(245,240,232,0.6); margin-top: 2px; }
   .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--white); position: sticky; top: 64px; z-index: 9; }
-  .tab { flex: 1; padding: 12px 8px; font-size: 13px; font-weight: 500; color: var(--muted); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+  .tab { flex: 1; padding: 12px 4px; font-size: 12px; font-weight: 500; color: var(--muted); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
   .tab.active { color: var(--green); border-bottom-color: var(--green); }
   .content { padding: 16px; }
   .section { display: none; } .section.active { display: block; }
@@ -26,7 +26,7 @@
   .api-bar label { font-size: 11px; font-weight: 500; color: #92400E; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px; }
   .api-row { display: flex; gap: 8px; }
   .api-row input { flex: 1; font-size: 13px; padding: 8px 10px; border: 1px solid #F59E0B; border-radius: 7px; background: white; font-family: 'DM Sans', sans-serif; outline: none; }
-  .api-saved { font-size: 11px; color: #166534; margin-top: 5px; display: none; }
+  .api-saved { font-size: 11px; color: #166534; margin-top: 5px; }
   .scan-bar { background: var(--green-pale); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
   .scan-bar label { font-size: 11px; font-weight: 500; color: var(--green); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px; }
   .add-form { background: var(--cream); border-radius: 12px; padding: 14px; margin-bottom: 16px; border: 1px solid var(--border); }
@@ -67,6 +67,9 @@
   .loading { text-align: center; padding: 30px; color: var(--muted); font-size: 14px; }
   .loading-dots::after { content: ''; animation: dots 1.5s infinite; }
   @keyframes dots { 0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; } }
+  .historie-item { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+  .historie-titel { font-size: 14px; font-weight: 500; margin-bottom: 3px; }
+  .historie-meta { font-size: 12px; color: var(--muted); }
   .cooked-modal { position: fixed; inset: 0; background: rgba(26,26,20,0.5); display: flex; align-items: flex-end; z-index: 100; padding: 16px; }
   .cooked-sheet { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-height: 80vh; overflow-y: auto; }
   .cooked-sheet h3 { font-family: 'Fraunces', serif; font-size: 18px; margin-bottom: 4px; }
@@ -84,27 +87,18 @@
 <div class="app">
   <div class="header">
     <h1>🌿 Kühlschrank</h1>
-    <p id="inv-summary">0 Zutaten im Inventar</p>
+    <p id="inv-summary">Lädt...</p>
   </div>
   <div class="tabs">
     <button class="tab active" onclick="showTab('inventar',this)">Inventar</button>
     <button class="tab" onclick="showTab('rezepte',this)">Rezepte</button>
+    <button class="tab" onclick="showTab('historie',this)">Historie</button>
+    <button class="tab" onclick="showTab('einstellungen',this)">⚙️</button>
   </div>
   <div class="content">
 
+    <!-- INVENTAR -->
     <div id="tab-inventar" class="section active">
-
-      <!-- API Key (auch hier damit Scanner funktioniert) -->
-      <div class="api-bar" id="api-bar-inventar">
-        <label>OpenAI API Key</label>
-        <div class="api-row">
-          <input type="password" id="api-key-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />
-          <button class="btn-save" onclick="saveApiKey()">Speichern</button>
-        </div>
-        <div class="api-saved" id="api-saved">✓ API Key gespeichert</div>
-      </div>
-
-      <!-- Kassenbon Scanner -->
       <div class="scan-bar">
         <label>Kassenbon scannen</label>
         <input type="file" id="bon-input" accept="image/*" capture="environment" style="display:none" onchange="scanBon(this)">
@@ -112,10 +106,8 @@
           📷 Kassenbon fotografieren
         </button>
       </div>
-
-      <!-- Manuell hinzufügen -->
       <div class="add-form">
-        <h3>Oder manuell hinzufügen</h3>
+        <h3>Manuell hinzufügen</h3>
         <div class="form-row"><input type="text" id="zutat-name" placeholder="z.B. Spinat, Eier, Hackfleisch..." /></div>
         <div class="form-row"><input type="text" id="zutat-menge" placeholder="z.B. 1 Tüte, 6 Stück, 1 Packung..." /></div>
         <div class="urgency-label">Hält wie lange?</div>
@@ -126,16 +118,35 @@
         </div>
         <button class="btn btn-primary" onclick="addItem()" style="width:100%">+ Hinzufügen</button>
       </div>
-
       <div id="inventory-list" class="inventory-list">
-        <div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.<br>Fotografiere deinen Kassenbon!</p></div>
+        <div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.</p></div>
       </div>
     </div>
 
+    <!-- REZEPTE -->
     <div id="tab-rezepte" class="section">
       <div class="recipe-intro">Basierend auf deinem Inventar generiere ich Rezepte die zuerst aufbrauchen was bald weg muss.</div>
       <button class="btn btn-orange" onclick="generateRecipes()">🍳 Rezepte generieren</button>
       <div id="recipes-container" style="margin-top:16px"></div>
+    </div>
+
+    <!-- HISTORIE -->
+    <div id="tab-historie" class="section">
+      <div id="historie-list">
+        <div class="empty-state"><div class="emoji">🍽️</div><p>Noch nichts gekocht.</p></div>
+      </div>
+    </div>
+
+    <!-- EINSTELLUNGEN -->
+    <div id="tab-einstellungen" class="section">
+      <div class="api-bar">
+        <label>OpenAI API Key</label>
+        <div class="api-row">
+          <input type="password" id="api-key-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+          <button class="btn-save" onclick="saveApiKey()">Speichern</button>
+        </div>
+        <div class="api-saved" id="api-saved"></div>
+      </div>
     </div>
 
   </div>
@@ -154,61 +165,49 @@
 </div>
 
 <script>
-let inventory = [], selectedUrgency = null, currentRecipe = null, cookedSelections = {}, apiKey = '';
+let inventory = [], selectedUrgency = null, currentRecipe = null, cookedSelections = {};
 
-function saveApiKey() {
-  apiKey = document.getElementById('api-key-input').value.trim();
-  if (apiKey) {
-    document.getElementById('api-saved').style.display = 'block';
-    document.getElementById('api-key-input').value = '';
-    document.getElementById('api-bar-inventar').style.display = 'none';
+// --- Init ---
+async function init() {
+  await loadInventar();
+  const res = await fetch('/settings');
+  const data = await res.json();
+  if (data.has_key) {
+    document.getElementById('api-saved').textContent = '✓ API Key gespeichert';
   }
 }
 
-async function scanBon(input) {
-  if (!apiKey) { alert('Bitte zuerst API Key eingeben und speichern!'); return; }
-  const file = input.files[0];
-  if (!file) return;
-  const btn = document.getElementById('scan-btn');
-  btn.textContent = '⏳ Bon wird gescannt...';
-  btn.disabled = true;
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    const base64 = e.target.result.split(',')[1];
-    try {
-      const response = await fetch('/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: apiKey, image: base64 })
-      });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      data.items.forEach(item => {
-        inventory.push({ id: Date.now() + Math.random(), name: item.name, menge: item.menge, urgency: item.haltbarkeit });
-      });
-      renderInventory();
-      btn.textContent = '✓ ' + data.items.length + ' Produkte erkannt!';
-      setTimeout(() => { btn.textContent = '📷 Kassenbon fotografieren'; btn.disabled = false; }, 3000);
-    } catch(e) {
-      alert('Fehler beim Scannen: ' + e.message);
-      btn.textContent = '📷 Kassenbon fotografieren';
-      btn.disabled = false;
-    }
-  };
-  reader.readAsDataURL(file);
+// --- API Key ---
+async function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) return;
+  await fetch('/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ openai_key: key })
+  });
+  document.getElementById('api-saved').textContent = '✓ API Key gespeichert';
+  document.getElementById('api-key-input').value = '';
 }
 
-function selectUrgency(u) {
-  selectedUrgency = u;
-  document.querySelectorAll('.urgency-btn').forEach(b => b.className = 'urgency-btn');
-  document.getElementById('urg-' + u).className = 'urgency-btn selected-' + u;
+// --- Inventar ---
+async function loadInventar() {
+  const res = await fetch('/inventar');
+  inventory = await res.json();
+  renderInventory();
 }
 
-function addItem() {
+async function addItem() {
   const name = document.getElementById('zutat-name').value.trim();
   const menge = document.getElementById('zutat-menge').value.trim();
   if (!name || !menge || !selectedUrgency) { alert('Bitte Name, Menge und Haltbarkeit angeben!'); return; }
-  inventory.push({ id: Date.now(), name, menge, urgency: selectedUrgency });
+  const res = await fetch('/inventar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, menge, urgency: selectedUrgency })
+  });
+  const item = await res.json();
+  inventory.push(item);
   document.getElementById('zutat-name').value = '';
   document.getElementById('zutat-menge').value = '';
   selectedUrgency = null;
@@ -216,7 +215,17 @@ function addItem() {
   renderInventory();
 }
 
-function removeItem(id) { inventory = inventory.filter(i => i.id !== id); renderInventory(); }
+async function removeItem(id) {
+  await fetch('/inventar/' + id, { method: 'DELETE' });
+  inventory = inventory.filter(i => i.id !== id);
+  renderInventory();
+}
+
+function selectUrgency(u) {
+  selectedUrgency = u;
+  document.querySelectorAll('.urgency-btn').forEach(b => b.className = 'urgency-btn');
+  document.getElementById('urg-' + u).className = 'urgency-btn selected-' + u;
+}
 
 function renderInventory() {
   const list = document.getElementById('inventory-list');
@@ -235,15 +244,47 @@ function renderInventory() {
     </div>`).join('');
 }
 
+// --- Kassenbon Scanner ---
+async function scanBon(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const btn = document.getElementById('scan-btn');
+  btn.textContent = '⏳ Bon wird gescannt...';
+  btn.disabled = true;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const base64 = e.target.result.split(',')[1];
+    try {
+      const response = await fetch('/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 })
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      await loadInventar();
+      btn.textContent = '✓ ' + data.items.length + ' Produkte erkannt!';
+      setTimeout(() => { btn.textContent = '📷 Kassenbon fotografieren'; btn.disabled = false; }, 3000);
+    } catch(e) {
+      alert('Fehler: ' + e.message);
+      btn.textContent = '📷 Kassenbon fotografieren';
+      btn.disabled = false;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+// --- Tabs ---
 function showTab(tab, el) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   el.classList.add('active');
+  if (tab === 'historie') loadHistorie();
 }
 
+// --- Rezepte ---
 async function generateRecipes() {
-  if (!apiKey) { alert('Bitte zuerst API Key im Inventar-Tab speichern!'); return; }
   if (inventory.length === 0) { alert('Füge zuerst Zutaten ein!'); return; }
   const container = document.getElementById('recipes-container');
   container.innerHTML = '<div class="loading">Rezepte werden generiert<span class="loading-dots"></span></div>';
@@ -251,17 +292,17 @@ async function generateRecipes() {
   const weekItems = inventory.filter(i => i.urgency === 'week');
   const laterItems = inventory.filter(i => i.urgency === 'later');
   const inventoryText = [
-    soonItems.length > 0 ? 'DRINGEND (bald weg): ' + soonItems.map(i => i.menge + ' ' + i.name).join(', ') : '',
+    soonItems.length > 0 ? 'DRINGEND: ' + soonItems.map(i => i.menge + ' ' + i.name).join(', ') : '',
     weekItems.length > 0 ? 'Diese Woche: ' + weekItems.map(i => i.menge + ' ' + i.name).join(', ') : '',
     laterItems.length > 0 ? 'Länger haltbar: ' + laterItems.map(i => i.menge + ' ' + i.name).join(', ') : ''
   ].filter(Boolean).join('\n');
   try {
-    const response = await fetch('/rezepte', {
+    const res = await fetch('/rezepte', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: apiKey, inventory_text: inventoryText })
+      body: JSON.stringify({ inventory_text: inventoryText })
     });
-    const data = await response.json();
+    const data = await res.json();
     if (data.error) throw new Error(data.error);
     renderRecipes(data.recipes);
   } catch(e) {
@@ -287,6 +328,7 @@ function renderRecipes(recipes) {
     </div>`).join('');
 }
 
+// --- Gekocht Modal ---
 function openCookedModal(recipe) {
   currentRecipe = recipe; cookedSelections = {};
   document.getElementById('cooked-title').textContent = recipe.titel + ' gekocht!';
@@ -311,21 +353,51 @@ function selectAmount(idx, amount, btn) {
 
 function closeModal() { document.getElementById('cooked-modal').style.display = 'none'; }
 
-function confirmCooked() {
+async function confirmCooked() {
   if (!currentRecipe) return;
-  currentRecipe.zutaten.forEach((z,i) => {
+  // Inventar aktualisieren
+  for (const [i, z] of currentRecipe.zutaten.entries()) {
     const amount = cookedSelections[i];
-    if (amount === 'alles') { inventory = inventory.filter(item => item.name.toLowerCase() !== z.name.toLowerCase()); }
-    else if (amount === 'haelfte' || amount === 'wenig') {
-      const item = inventory.find(item => item.name.toLowerCase() === z.name.toLowerCase());
-      if (item) { item.menge = amount === 'haelfte' ? 'ca. die Hälfte noch' : 'wenig übrig'; item.urgency = 'soon'; }
+    const item = inventory.find(item => item.name.toLowerCase() === z.name.toLowerCase());
+    if (!item) continue;
+    if (amount === 'alles') {
+      await fetch('/inventar/' + item.id, { method: 'DELETE' });
+    } else if (amount === 'haelfte' || amount === 'wenig') {
+      await fetch('/inventar/' + item.id, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ menge: amount === 'haelfte' ? 'ca. die Hälfte noch' : 'wenig übrig', urgency: 'soon' })
+      });
     }
+  }
+  // In Historie speichern
+  await fetch('/historie', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ titel: currentRecipe.titel, zutaten: currentRecipe.zutaten })
   });
-  closeModal(); renderInventory();
-  alert('Inventar aktualisiert! 🎉');
+  await loadInventar();
+  closeModal();
+  alert('Gespeichert! 🎉');
 }
 
-renderInventory();
+// --- Historie ---
+async function loadHistorie() {
+  const res = await fetch('/historie');
+  const data = await res.json();
+  const list = document.getElementById('historie-list');
+  if (data.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="emoji">🍽️</div><p>Noch nichts gekocht.</p></div>';
+    return;
+  }
+  list.innerHTML = data.map(r => `
+    <div class="historie-item">
+      <div class="historie-titel">${r.titel}</div>
+      <div class="historie-meta">${r.gekocht_am} · ${r.zutaten.map(z => z.name).join(', ')}</div>
+    </div>`).join('');
+}
+
+init();
 </script>
 </body>
 </html>
