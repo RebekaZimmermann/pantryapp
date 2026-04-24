@@ -80,13 +80,13 @@
   .day-header { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 14px 0 8px; }
   .einkauf-kategorie { margin-bottom: 14px; }
   .einkauf-kategorie h4 { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
-  .einkauf-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--cream); font-size: 13px; }
+  .einkauf-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--cream); font-size: 13px; gap: 4px; }
   .einkauf-item.checked { opacity: 0.4; text-decoration: line-through; }
   .einkauf-name { flex: 1; }
-  .einkauf-menge { color: var(--muted); font-size: 12px; margin-right: 8px; }
-  .einkauf-preis { color: var(--green); font-weight: 500; font-size: 12px; margin-right: 8px; }
-  .einkauf-typ-fehlend { font-size: 10px; background: var(--orange-pale); color: var(--orange); padding: 2px 5px; border-radius: 4px; }
-  .einkauf-typ-extra { font-size: 10px; background: var(--green-pale); color: var(--green); padding: 2px 5px; border-radius: 4px; }
+  .einkauf-menge { color: var(--muted); font-size: 12px; }
+  .einkauf-preis { color: var(--green); font-weight: 500; font-size: 12px; }
+  .einkauf-typ-fehlend { font-size: 10px; background: var(--orange-pale); color: var(--orange); padding: 2px 5px; border-radius: 4px; white-space: nowrap; }
+  .einkauf-typ-extra { font-size: 10px; background: var(--green-pale); color: var(--green); padding: 2px 5px; border-radius: 4px; white-space: nowrap; }
   .budget-bar { background: var(--green-pale); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
   .budget-row { display: flex; justify-content: space-between; font-size: 13px; }
   .budget-total { font-weight: 500; color: var(--green); }
@@ -98,6 +98,8 @@
   .extra-grund { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .extra-preis { font-size: 12px; color: var(--green); font-weight: 500; }
   .section-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 8px; }
+  .add-to-list-btn { font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--green); background: transparent; color: var(--green); cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+  .add-to-list-btn:disabled { border-color: var(--muted); color: var(--muted); cursor: default; }
   .barcode-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .barcode-modal h3 { color: white; font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 8px; }
   .barcode-modal p { color: rgba(255,255,255,0.6); font-size: 13px; margin-bottom: 16px; }
@@ -264,6 +266,7 @@ let currentRecipe = null, cookedSelections = {};
 let currentProductName = '', lastScannedCode = '';
 let codeReader = null;
 let checkedItems = new Set();
+let einkaufItemCount = 0;
 
 async function init() { await loadInventar(); }
 
@@ -480,6 +483,7 @@ function renderMealPlan(data) {
   const days = ['Mo','Di','Mi','Do','Fr','Sa','So'];
   const today = new Date().getDay();
   checkedItems = new Set();
+  einkaufItemCount = 0;
   let html = '';
 
   // Meal Plan
@@ -506,17 +510,24 @@ function renderMealPlan(data) {
   if (extra_zutaten && extra_zutaten.length > 0) {
     html += '<div class="section-label" style="margin-top:20px">✨ Empfohlene Extra-Zutaten</div>';
     html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Diese Zutaten würden deine Rezepte deutlich aufwerten</div>';
-    for (const z of extra_zutaten) {
+    extra_zutaten.forEach((z, i) => {
+      const safeKat = (z.kategorie || 'Sonstiges').replace(/'/g, '');
+      const safeName = z.name.replace(/'/g, '');
+      const safeMenge = (z.menge || '1 Stück').replace(/'/g, '');
+      const preis = z.preis_ca || 0;
       html += `<div class="extra-card">
-        <div style="display:flex;justify-content:space-between;align-items:start">
-          <div>
-            <div class="extra-name">${z.name} <span style="font-size:12px;color:var(--muted);font-weight:400">· ${z.menge}</span></div>
-            <div class="extra-grund">${z.grund}</div>
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+          <div style="flex:1">
+            <div class="extra-name">${z.name} <span style="font-size:12px;color:var(--muted);font-weight:400">· ${z.menge || ''}</span></div>
+            <div class="extra-grund">${z.grund || ''}</div>
           </div>
-          <div class="extra-preis">ca. ${z.preis_ca ? z.preis_ca.toFixed(2) + ' €' : '–'}</div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+            <div class="extra-preis">${preis ? preis.toFixed(2) + ' €' : '–'}</div>
+            <button class="add-to-list-btn" id="extra-btn-${i}" onclick="addExtraToEinkaufsliste('${safeName}','${safeMenge}','${safeKat}',${preis},${i})">+ zur Liste</button>
+          </div>
         </div>
       </div>`;
-    }
+    });
   }
 
   // Budget Bar
@@ -535,30 +546,65 @@ function renderMealPlan(data) {
   }
 
   // Einkaufsliste
-  html += '<div class="section-label" style="margin-top:20px">🛒 Einkaufsliste</div>';
+  html += '<div class="section-label" style="margin-top:20px" id="einkaufsliste-header">🛒 Einkaufsliste</div>';
+  html += '<div id="einkaufsliste-wrapper">';
   const kategorien = Object.entries(einkaufsliste || {}).filter(([k, v]) => v && v.length > 0);
   if (kategorien.length === 0) {
     html += '<div style="font-size:13px;color:var(--muted);padding:12px 0">Du hast alles – kein Einkauf nötig! 🎉</div>';
   } else {
-    let itemIndex = 0;
     for (const [kategorie, items] of kategorien) {
-      html += `<div class="einkauf-kategorie">
+      html += `<div class="einkauf-kategorie" data-kategorie="${kategorie}">
         <h4>${kategorie}</h4>`;
       for (const item of items) {
-        const idx = itemIndex++;
-        html += `<div class="einkauf-item" id="einkauf-${idx}">
-          <div class="checkbox" id="cb-${idx}" onclick="toggleCheck(${idx})"></div>
-          <div class="einkauf-name" style="margin-left:8px">${item.name}</div>
-          <div class="einkauf-menge">${item.menge}</div>
-          <div class="einkauf-preis">${item.preis_ca ? item.preis_ca.toFixed(2) + ' €' : ''}</div>
-          <div class="einkauf-typ-${item.typ || 'extra'}">${item.typ === 'fehlend' ? 'fehlt' : 'extra'}</div>
-        </div>`;
+        const idx = einkaufItemCount++;
+        html += renderEinkaufItem(idx, item.name, item.menge, item.preis_ca, item.typ || 'extra');
       }
       html += '</div>';
     }
   }
+  html += '</div>';
 
   document.getElementById('mealplan-container').innerHTML = html;
+}
+
+function renderEinkaufItem(idx, name, menge, preis, typ) {
+  return `<div class="einkauf-item" id="einkauf-${idx}">
+    <div class="checkbox" id="cb-${idx}" onclick="toggleCheck(${idx})"></div>
+    <div class="einkauf-name" style="margin-left:8px">${name}</div>
+    <div class="einkauf-menge">${menge || ''}</div>
+    <div class="einkauf-preis">${preis ? parseFloat(preis).toFixed(2) + ' €' : ''}</div>
+    <div class="einkauf-typ-${typ}">${typ === 'fehlend' ? 'fehlt' : 'extra'}</div>
+  </div>`;
+}
+
+function addExtraToEinkaufsliste(name, menge, kategorie, preis, btnIdx) {
+  const wrapper = document.getElementById('einkaufsliste-wrapper');
+  if (!wrapper) return;
+
+  // Passende Kategorie suchen
+  const katEls = wrapper.querySelectorAll('.einkauf-kategorie');
+  let targetKat = null;
+  for (const el of katEls) {
+    if (el.dataset.kategorie === kategorie) { targetKat = el; break; }
+  }
+
+  const idx = einkaufItemCount++;
+  const itemHtml = renderEinkaufItem(idx, name, menge, preis, 'extra');
+
+  if (targetKat) {
+    targetKat.insertAdjacentHTML('beforeend', itemHtml);
+  } else {
+    // Neue Kategorie anlegen
+    const newKat = document.createElement('div');
+    newKat.className = 'einkauf-kategorie';
+    newKat.dataset.kategorie = kategorie;
+    newKat.innerHTML = `<h4>${kategorie}</h4>${itemHtml}`;
+    wrapper.appendChild(newKat);
+  }
+
+  // Button deaktivieren
+  const btn = document.getElementById('extra-btn-' + btnIdx);
+  if (btn) { btn.textContent = '✓ hinzugefügt'; btn.disabled = true; }
 }
 
 function toggleCheck(idx) {
