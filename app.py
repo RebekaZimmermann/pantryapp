@@ -39,6 +39,10 @@ class GespeichertesRezept(db.Model):
     quelle = db.Column(db.String(50), default='manuell')
     gespeichert_am = db.Column(db.DateTime, default=datetime.utcnow)
 
+class UserSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ernaehrung = db.Column(db.String(50), default='alles')  # alles, vegetarisch, vegan, pescetarisch, kein_schwein
+
 with app.app_context():
     db.create_all()
 
@@ -130,6 +134,74 @@ def add_mein_rezept():
 def delete_mein_rezept(rezept_id):
     r = GespeichertesRezept.query.get_or_404(rezept_id)
     db.session.delete(r)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+# --- User Settings ---
+@app.route('/user-settings', methods=['GET'])
+def get_user_settings():
+    s = UserSettings.query.first()
+    if not s:
+        return jsonify({'ernaehrung': 'alles'})
+    return jsonify({'ernaehrung': s.ernaehrung})
+
+@app.route('/user-settings', methods=['POST'])
+def save_user_settings():
+    data = request.json
+    s = UserSettings.query.first()
+    if s:
+        s.ernaehrung = data.get('ernaehrung', 'alles')
+    else:
+        s = UserSettings(ernaehrung=data.get('ernaehrung', 'alles'))
+        db.session.add(s)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+# --- Meal als gekocht markieren ---
+@app.route('/meal-gekocht', methods=['POST', 'OPTIONS'])
+def meal_gekocht():
+    if request.method == 'OPTIONS':
+        return jsonify({'ok': True}), 200
+    data = request.json
+    zutaten = data.get('zutaten', [])
+    portionen = float(data.get('portionen', 1))
+    titel = data.get('titel', '')
+
+    for zutat in zutaten:
+        name = zutat.get('name', '').lower()
+        menge_str = zutat.get('menge', '').lower()
+        kaufen = zutat.get('kaufen', False)
+        if kaufen:
+            continue  # Eingekaufte Zutat – nicht im Inventar
+
+        item = InventarItem.query.filter(
+            db.func.lower(InventarItem.name) == name
+        ).first()
+        if not item:
+            continue
+
+        # Mengenreduktion basierend auf Portionen
+        if portionen >= 1.5:
+            # Viel verbraucht
+            if any(w in menge_str for w in ['ganz', 'alles', 'alle', 'komplett']):
+                db.session.delete(item)
+            else:
+                item.menge = 'wenig übrig'
+                item.urgency = 'soon'
+        else:
+            # 1 Portion
+            if any(w in menge_str for w in ['ganz', 'alles', 'alle', 'komplett']):
+                db.session.delete(item)
+            elif any(w in menge_str for w in ['hälfte', 'halb']):
+                item.menge = 'wenig übrig'
+                item.urgency = 'soon'
+            else:
+                item.menge = 'wenig übrig'
+                item.urgency = 'soon'
+
+    # In Historie speichern
+    r = GekochteRezept(titel=titel, zutaten_json=json.dumps(zutaten))
+    db.session.add(r)
     db.session.commit()
     return jsonify({'ok': True})
 
@@ -258,7 +330,20 @@ def mealplan():
     mahlzeiten_pro_tag = int(data.get('mahlzeiten', 2))
     budget = float(data.get('budget', 0))
     gespeicherte_ids = data.get('gespeicherte_rezepte', [])
+    meal_prep = data.get('meal_prep', False)
     total = tage * mahlzeiten_pro_tag
+
+    # Ernährungspräferenz aus DB laden
+    user_settings = UserSettings.query.first()
+    ernaehrung = user_settings.ernaehrung if user_settings else 'alles'
+    ernaehrung_map = {
+        'alles': 'keine Einschränkungen',
+        'vegetarisch': 'vegetarisch – kein Fleisch, kein Fisch',
+        'vegan': 'vegan – keine tierischen Produkte',
+        'pescetarisch': 'pescetarisch – kein Fleisch, aber Fisch und Meeresfrüchte erlaubt',
+        'kein_schwein': 'kein Schweinefleisch'
+    }
+    ernaehrung_text = ernaehrung_map.get(ernaehrung, 'keine Einschränkungen')
 
     items = InventarItem.query.all()
     if not items:
@@ -351,21 +436,22 @@ def mealplan():
                 response = client.chat.completions.create(
                     model='gpt-4o', max_tokens=800,
                     messages=[
-                        {"role": "system", "content": """Du planst Mahlzeiten für eine einzelne Person in Deutschland.
+                        {"role": "system", "content": f"""Du planst Mahlzeiten für eine einzelne Person in Deutschland.
 Generiere GENAU 1 Rezept als JSON.
+ERNÄHRUNG: {ernaehrung_text} – halte dich STRIKT daran.
 REGELN:
 - Du darfst ALLE Zutaten verwenden – nicht nur Inventar
-- Jede Mahlzeit MUSS enthalten: Protein (Fleisch/Fisch/Hülsenfrüchte/Eier/Tofu) + Gemüse + Kohlenhydrate
-- Abwechslung ist Pflicht: verschiedene Gemüsesorten, verschiedene Proteinquellen, verschiedene Küchen (mediterran, asiatisch, deutsch, etc.)
+- Jede Mahlzeit MUSS enthalten: Protein + Gemüse + Kohlenhydrate
+- Abwechslung ist Pflicht: verschiedene Gemüsesorten, verschiedene Proteinquellen, verschiedene Küchen
 - Nicht wiederholen was bereits geplant ist
 - Realistische, leckere Alltagsgerichte für 1 Person
 - Budget pro Mahlzeit einhalten
 - Korrekte deutsche Umlaute
 - NUR JSON, kein Text davor/danach
-Format: {"titel":"Name","zeit":"25 Min","beschreibung":"Kurze appetitliche Beschreibung","zutaten":[{"name":"Hähnchenbrust","menge":"1 Stück (ca. 200g)","kaufen":true},{"name":"Brokkoli","menge":"1 kleiner Kopf","kaufen":true},{"name":"Nudeln","menge":"100g","kaufen":false}],"zubereitung":"Schritt 1: ...","naehrstoffe":{"protein":"Hähnchen","gemuese":"Brokkoli","kohlenhydrate":"Nudeln"}}
-Setze "kaufen":true für neue Zutaten die eingekauft werden müssen, "kaufen":false für Inventar-Zutaten."""},
+Format: {{"titel":"Name","zeit":"25 Min","beschreibung":"Kurze appetitliche Beschreibung","zutaten":[{{"name":"Hähnchenbrust","menge":"1 Stück (ca. 200g)","kaufen":true}},{{"name":"Brokkoli","menge":"1 kleiner Kopf","kaufen":true}},{{"name":"Nudeln","menge":"100g","kaufen":false}}],"zubereitung":"Schritt 1: ...","naehrstoffe":{{"protein":"Hähnchen","gemuese":"Brokkoli","kohlenhydrate":"Nudeln"}}}}
+Setze "kaufen":true für neue Zutaten, "kaufen":false für Inventar-Zutaten."""},
                         {"role": "user", "content": f"""Noch im Inventar (kostenlos nutzbar): {inv_rest}
-Budget pro Mahlzeit: {f'ca. {budget_pro_mahlzeit:.2f} €' if budget_pro_mahlzeit > 0 else 'kein festes Budget, aber günstig kochen'}
+Budget pro Mahlzeit: {f'ca. {budget_pro_mahlzeit:.2f} €' if budget_pro_mahlzeit > 0 else 'günstig kochen'}
 Heute bereits geplant: {todays_titles}
 Alle geplanten Gerichte bisher (nicht wiederholen): {already_planned}
 Mahlzeit: Tag {tag} von {tage}, {mahlzeit_label}
@@ -387,15 +473,16 @@ Wähle andere Proteinquelle und andere Gemüsesorten als bereits geplant. Sei kr
                 response = client.chat.completions.create(
                     model='gpt-4o', max_tokens=800,
                     messages=[
-                        {"role": "system", "content": """Du planst Mahlzeiten für eine Person.
+                        {"role": "system", "content": f"""Du planst Mahlzeiten für eine Person.
 Generiere GENAU 1 Rezept als JSON.
+ERNÄHRUNG: {ernaehrung_text} – halte dich STRIKT daran.
 REGELN:
 - Verwende NUR Zutaten aus dem Inventar plus Wasser/Salz/Pfeffer/Öl
 - Dringende Zutaten MÜSSEN verwendet werden
 - Nicht wiederholen
 - Korrekte deutsche Umlaute
 - NUR JSON
-Format: {"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","zutaten":[{"name":"Spinat","menge":"ganze Tüte","urgency":"soon","kaufen":false}],"zubereitung":"Schritt 1: ..."}"""},
+Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","zutaten":[{{"name":"Spinat","menge":"ganze Tüte","urgency":"soon","kaufen":false}}],"zubereitung":"Schritt 1: ..."}}"""},
                         {"role": "user", "content": f"Inventar:\n{chr(10).join(inv_parts)}\n\nBereits geplant: {already_planned}\nTag {tag} von {tage}, {mahlzeit_label}{urgency_instruction}"}
                     ]
                 )
@@ -430,6 +517,25 @@ Format: {"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","zutaten":[{"name"
                         break
         except Exception as e:
             plan.append({'tag': tag, 'mahlzeit': mahlzeit_label, 'titel': 'Fehler', 'beschreibung': str(e), 'zutaten': [], 'zubereitung': '', 'quelle': 'ki'})
+
+    # Meal Prep: Abendessen als nächstes Mittagessen einplanen
+    if meal_prep and mahlzeiten_pro_tag >= 2:
+        plan_mit_prep = []
+        i = 0
+        while i < len(plan):
+            m = plan[i]
+            plan_mit_prep.append(m)
+            # Wenn Abendessen und nächster Tag hat Mittagessen
+            if m.get('mahlzeit') == 'Abendessen' and m.get('tag', 0) < tage:
+                next_tag = m['tag'] + 1
+                # Prüfen ob nächstes Mittagessen bereits vorhanden
+                has_next_mittag = any(p.get('tag') == next_tag and p.get('mahlzeit') == 'Mittagessen' for p in plan)
+                if not has_next_mittag:
+                    # Abendessen als Mittagessen für nächsten Tag einplanen
+                    prep_meal = {**m, 'tag': next_tag, 'mahlzeit': 'Mittagessen', 'quelle': 'meal_prep', 'meal_prep_von': m['titel']}
+                    plan_mit_prep.append(prep_meal)
+            i += 1
+        plan = plan_mit_prep
 
     # Einkaufsliste & Extra-Zutaten
     all_items_text = ', '.join([f"{i.menge} {i.name}" for i in items])

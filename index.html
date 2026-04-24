@@ -252,6 +252,13 @@
           <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Mahlzeiten/Tag</div><input type="number" id="plan-mahlzeiten" value="2" min="1" max="3" style="text-align:center" /></div>
           <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Budget (€)</div><input type="number" id="plan-budget" value="0" min="0" step="5" style="text-align:center" /></div>
         </div>
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;margin-bottom:10px;padding:10px 12px;background:var(--white);border-radius:8px;border:1px solid var(--border)">
+          <input type="checkbox" id="meal-prep-toggle" style="accent-color:var(--green);width:16px;height:16px">
+          <div>
+            <div style="font-weight:500">🍱 Meal Prep</div>
+            <div style="font-size:11px;color:var(--muted)">Abendessen für nächsten Tag als Mittagessen einplanen</div>
+          </div>
+        </label>
         <div id="rezept-auswahl-container"></div>
         <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="generateMealPlan()">🗓 Plan generieren</button>
       </div>
@@ -272,6 +279,28 @@
           <button class="btn-save" onclick="saveApiKey()">Speichern</button>
         </div>
         <div class="api-saved" id="api-saved"></div>
+      </div>
+      <div style="background:var(--green-pale);border-radius:12px;padding:14px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:500;color:var(--green);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Ernährungspräferenz</div>
+        <div style="display:flex;flex-direction:column;gap:8px" id="ernaehrung-options">
+          <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
+            <input type="radio" name="ernaehrung" value="alles" style="accent-color:var(--green);width:16px;height:16px"> Alles – keine Einschränkungen
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
+            <input type="radio" name="ernaehrung" value="vegetarisch" style="accent-color:var(--green);width:16px;height:16px"> Vegetarisch
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
+            <input type="radio" name="ernaehrung" value="vegan" style="accent-color:var(--green);width:16px;height:16px"> Vegan
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
+            <input type="radio" name="ernaehrung" value="pescetarisch" style="accent-color:var(--green);width:16px;height:16px"> Pescetarisch (kein Fleisch, aber Fisch)
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
+            <input type="radio" name="ernaehrung" value="kein_schwein" style="accent-color:var(--green);width:16px;height:16px"> Kein Schweinefleisch
+          </label>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="saveErnaehrung()">Speichern</button>
+        <div id="ernaehrung-saved" style="font-size:11px;color:#166534;margin-top:5px;display:none">✓ Gespeichert</div>
       </div>
     </div>
   </div>
@@ -326,8 +355,22 @@
   </div>
 </div>
 
-<!-- Gekocht Modal -->
-<div id="cooked-modal" class="cooked-modal" style="display:none">
+<!-- Gekocht Modal (Plan) -->
+<div id="plan-gekocht-modal" class="product-modal" style="display:none">
+  <div class="product-sheet">
+    <h3 id="plan-gekocht-titel">Gekocht!</h3>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Wie viele Portionen hast du gekocht?</div>
+    <div class="urgency-row" style="margin-bottom:16px">
+      <button class="urgency-btn" id="port-1" onclick="selectPortionen(1)">1 Portion</button>
+      <button class="urgency-btn" id="port-2" onclick="selectPortionen(2)">2 Portionen</button>
+      <button class="urgency-btn" id="port-3" onclick="selectPortionen(3)">3 Portionen</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closePlanGekocht()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="confirmPlanGekocht()">✓ Bestätigen</button>
+    </div>
+  </div>
+</div>
   <div class="cooked-sheet">
     <h3 id="cooked-title">Rezept gekocht!</h3>
     <p>Wie viel hast du von jeder Zutat benutzt?</p>
@@ -357,6 +400,7 @@ let currentPlanData = null;
 async function init() {
   await loadInventar();
   await loadMeineRezepte();
+  await loadErnaehrung();
 }
 
 // --- Inventar ---
@@ -756,13 +800,14 @@ async function generateMealPlan() {
   const total = tage * mahlzeiten;
 
   const selectedIds = [...document.querySelectorAll('[id^="cb-rezept-"]:checked')].map(cb => parseInt(cb.value));
+  const mealPrep = document.getElementById('meal-prep-toggle')?.checked || false;
 
   const container = document.getElementById('mealplan-container');
   container.innerHTML = `<div class="loading">Plan wird generiert – ca. ${total * 4 + 10} Sekunden<span class="loading-dots"></span></div>`;
   try {
     const res = await fetch('/mealplan', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tage, mahlzeiten, budget, gespeicherte_rezepte: selectedIds })
+      body: JSON.stringify({ tage, mahlzeiten, budget, gespeicherte_rezepte: selectedIds, meal_prep: mealPrep })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
@@ -825,7 +870,7 @@ function renderMealPlan(data) {
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div style="display:flex;align-items:center">
             <span class="drag-handle" title="Verschieben">⠿</span>
-            <div class="plan-mahlzeit">${m.mahlzeit}${isGespeichert ? ' · <span style="color:#4C3DB5;font-size:10px">📖 Gespeichert</span>' : ''}${m.phase === 2 ? ' · <span style="color:var(--green);font-size:10px">🛒 Einkauf</span>' : ''}</div>
+            <div class="plan-mahlzeit">${m.mahlzeit}${isGespeichert ? ' · <span style="color:#4C3DB5;font-size:10px">📖 Gespeichert</span>' : ''}${m.phase === 2 ? ' · <span style="color:var(--green);font-size:10px">🛒 Einkauf</span>' : ''}${m.quelle === 'meal_prep' ? ' · <span style="color:#0369A1;font-size:10px">🍱 Meal Prep</span>' : ''}</div>
           </div>
           <div style="display:flex;align-items:center;gap:4px">
             ${urgentCount > 0 ? `<span style="font-size:10px;background:var(--orange-pale);color:var(--orange);padding:2px 6px;border-radius:10px;font-weight:500">🔴 ${urgentCount}</span>` : ''}
@@ -840,6 +885,7 @@ function renderMealPlan(data) {
         <div class="plan-actions">
           ${m.zubereitung ? `<button class="btn-small" id="zubbtn-${rezeptId}" onclick="toggleZubereitung('${rezeptId}')">▼ Zubereitung</button>` : ''}
           <button class="btn-small" id="${saveId}" onclick="savePlanRezept(${rezeptData}, '${saveId}')">🔖 Speichern</button>
+          <button class="btn-small" id="gekocht-${cardIdx}" onclick="openGekocht(${cardIdx})">✓ Gekocht</button>
         </div>
       </div>`;
       planCards[cardIdx] = { ...m, tag: t };
@@ -1053,6 +1099,69 @@ async function saveApiKey() {
   await fetch('/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ openai_key: key }) });
   document.getElementById('api-saved').textContent = '✓ API Key gespeichert';
   document.getElementById('api-key-input').value = '';
+}
+
+async function loadErnaehrung() {
+  try {
+    const res = await fetch('/user-settings');
+    const data = await res.json();
+    const radios = document.querySelectorAll('input[name="ernaehrung"]');
+    radios.forEach(r => { if (r.value === data.ernaehrung) r.checked = true; });
+  } catch(e) {}
+}
+
+async function saveErnaehrung() {
+  const selected = document.querySelector('input[name="ernaehrung"]:checked');
+  if (!selected) return;
+  await fetch('/user-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ernaehrung: selected.value }) });
+  const saved = document.getElementById('ernaehrung-saved');
+  saved.style.display = 'block';
+  setTimeout(() => { saved.style.display = 'none'; }, 2000);
+}
+
+// Plan Gekocht
+let currentGekochIdx = null;
+let selectedPortionen = 1;
+
+function openGekocht(idx) {
+  currentGekochIdx = idx;
+  selectedPortionen = 1;
+  const m = planCards[idx];
+  if (!m) return;
+  document.getElementById('plan-gekocht-titel').textContent = m.titel + ' gekocht!';
+  document.querySelectorAll('[id^="port-"]').forEach(b => b.className = 'urgency-btn');
+  document.getElementById('port-1').className = 'urgency-btn selected-later';
+  document.getElementById('plan-gekocht-modal').style.display = 'flex';
+}
+
+function selectPortionen(n) {
+  selectedPortionen = n;
+  document.querySelectorAll('[id^="port-"]').forEach(b => b.className = 'urgency-btn');
+  document.getElementById('port-' + n).className = 'urgency-btn selected-later';
+}
+
+function closePlanGekocht() {
+  document.getElementById('plan-gekocht-modal').style.display = 'none';
+  currentGekochIdx = null;
+}
+
+async function confirmPlanGekocht() {
+  if (currentGekochIdx === null) return;
+  const m = planCards[currentGekochIdx];
+  if (!m) return;
+  try {
+    await fetch('/meal-gekocht', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ titel: m.titel, zutaten: m.zutaten || [], portionen: selectedPortionen })
+    });
+    await loadInventar();
+    closePlanGekocht();
+    // Button als gekocht markieren
+    const btn = document.getElementById('gekocht-' + currentGekochIdx);
+    if (btn) { btn.textContent = '✓ Gekocht'; btn.classList.add('saved'); btn.disabled = true; }
+    const card = document.getElementById('card-' + currentGekochIdx);
+    if (card) card.style.opacity = '0.6';
+  } catch(e) { alert('Fehler: ' + e.message); }
 }
 
 // --- Drag & Drop ---
