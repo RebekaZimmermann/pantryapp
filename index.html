@@ -76,7 +76,12 @@
   .plan-mahlzeit { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
   .plan-titel { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 500; margin-bottom: 4px; }
   .plan-desc { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-  .plan-zutaten { font-size: 12px; color: var(--green); }
+  .plan-zutaten { font-size: 12px; color: var(--green); margin-bottom: 8px; }
+  .plan-zubereitung { font-size: 12px; color: var(--text); line-height: 1.6; margin-bottom: 8px; background: var(--cream); border-radius: 8px; padding: 8px 10px; display: none; }
+  .plan-actions { display: flex; gap: 6px; }
+  .btn-small { font-size: 12px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; cursor: pointer; font-family: 'DM Sans', sans-serif; color: var(--muted); }
+  .btn-small:hover { background: var(--cream); }
+  .btn-small.saved { border-color: var(--green); color: var(--green); }
   .day-header { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 14px 0 8px; }
   .einkauf-kategorie { margin-bottom: 14px; }
   .einkauf-kategorie h4 { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
@@ -100,6 +105,8 @@
   .section-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 8px; }
   .add-to-list-btn { font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--green); background: transparent; color: var(--green); cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
   .add-to-list-btn:disabled { border-color: var(--muted); color: var(--muted); cursor: default; }
+  .add-all-btn { font-size: 12px; padding: 6px 12px; border-radius: 7px; border: 1.5px solid var(--green); background: transparent; color: var(--green); cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500; }
+  .add-all-btn:disabled { border-color: var(--muted); color: var(--muted); cursor: default; }
   .barcode-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .barcode-modal h3 { color: white; font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 8px; }
   .barcode-modal p { color: rgba(255,255,255,0.6); font-size: 13px; margin-bottom: 16px; }
@@ -267,6 +274,7 @@ let currentProductName = '', lastScannedCode = '';
 let codeReader = null;
 let checkedItems = new Set();
 let einkaufItemCount = 0;
+let currentExtraZutaten = [];
 
 async function init() { await loadInventar(); }
 
@@ -478,13 +486,41 @@ async function generateMealPlan() {
   }
 }
 
+function toggleZubereitung(id) {
+  const el = document.getElementById('zub-' + id);
+  const btn = document.getElementById('zubbtn-' + id);
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    btn.textContent = '▲ Zubereitung';
+  } else {
+    el.style.display = 'none';
+    btn.textContent = '▼ Zubereitung';
+  }
+}
+
+async function savePlanRezept(rezept, btnId) {
+  try {
+    await fetch('/historie', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ titel: rezept.titel, zutaten: rezept.zutaten || [] })
+    });
+    const btn = document.getElementById(btnId);
+    btn.textContent = '✓ Gespeichert';
+    btn.classList.add('saved');
+    btn.disabled = true;
+  } catch(e) { alert('Fehler beim Speichern'); }
+}
+
 function renderMealPlan(data) {
   const { plan, tage, einkaufsliste, extra_zutaten, budget, budget_verwendet } = data;
   const days = ['Mo','Di','Mi','Do','Fr','Sa','So'];
   const today = new Date().getDay();
   checkedItems = new Set();
   einkaufItemCount = 0;
+  currentExtraZutaten = extra_zutaten || [];
   let html = '';
+  let planRezepte = [];
 
   // Meal Plan
   html += '<div class="section-label">Dein Wochenplan</div>';
@@ -494,6 +530,10 @@ function renderMealPlan(data) {
     html += `<div class="day-header">Tag ${t} · ${dayLabel}</div>`;
     for (const m of mahlzeiten) {
       const urgentCount = (m.zutaten || []).filter(z => z.urgency === 'soon').length;
+      const rezeptId = `plan-${t}-${m.mahlzeit.replace(/\s/g,'')}`;
+      const saveId = `savebtn-${rezeptId}`;
+      const rezeptData = JSON.stringify(m).replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+      planRezepte.push(m);
       html += `<div class="plan-card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div class="plan-mahlzeit">${m.mahlzeit}</div>
@@ -502,6 +542,11 @@ function renderMealPlan(data) {
         <div class="plan-titel">${m.titel}</div>
         <div class="plan-desc">${m.beschreibung || ''}</div>
         <div class="plan-zutaten">${(m.zutaten || []).map(z => z.name).join(' · ')}</div>
+        <div class="plan-zubereitung" id="zub-${rezeptId}">${m.zubereitung || ''}</div>
+        <div class="plan-actions">
+          <button class="btn-small" id="zubbtn-${rezeptId}" onclick="toggleZubereitung('${rezeptId}')">▼ Zubereitung</button>
+          <button class="btn-small" id="${saveId}" onclick="savePlanRezept(${rezeptData}, '${saveId}')">🔖 Speichern</button>
+        </div>
       </div>`;
     }
   }
@@ -509,7 +554,8 @@ function renderMealPlan(data) {
   // Extra Zutaten
   if (extra_zutaten && extra_zutaten.length > 0) {
     html += '<div class="section-label" style="margin-top:20px">✨ Empfohlene Extra-Zutaten</div>';
-    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Diese Zutaten würden deine Rezepte deutlich aufwerten</div>';
+    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Diese Zutaten würden deine Rezepte aufwerten – füge sie einzeln oder alle auf einmal zur Einkaufsliste hinzu.</div>';
+    html += `<div style="margin-bottom:10px"><button class="add-all-btn" id="add-all-btn" onclick="addAllExtraToList()">+ Alle zur Einkaufsliste</button></div>`;
     extra_zutaten.forEach((z, i) => {
       const safeKat = (z.kategorie || 'Sonstiges').replace(/'/g, '');
       const safeName = z.name.replace(/'/g, '');
@@ -541,11 +587,11 @@ function renderMealPlan(data) {
         <span class="budget-total" style="${over ? 'color:var(--orange)' : ''}">${budget_verwendet.toFixed(2)} € / ${budget.toFixed(2)} €</span>
       </div>
       <div class="budget-progress"><div class="budget-fill${over ? ' over' : ''}" style="width:${pct}%"></div></div>
-      ${over ? '<div style="font-size:11px;color:var(--orange);margin-top:4px">Budget überschritten – einige Extra-Zutaten entfernen?</div>' : ''}
+      ${over ? '<div style="font-size:11px;color:var(--orange);margin-top:4px">Budget überschritten</div>' : ''}
     </div>`;
   }
 
-  // Einkaufsliste
+  // Einkaufsliste (nur fehlende Zutaten)
   html += '<div class="section-label" style="margin-top:20px" id="einkaufsliste-header">🛒 Einkaufsliste</div>';
   html += '<div id="einkaufsliste-wrapper">';
   const kategorien = Object.entries(einkaufsliste || {}).filter(([k, v]) => v && v.length > 0);
@@ -553,11 +599,10 @@ function renderMealPlan(data) {
     html += '<div style="font-size:13px;color:var(--muted);padding:12px 0">Du hast alles – kein Einkauf nötig! 🎉</div>';
   } else {
     for (const [kategorie, items] of kategorien) {
-      html += `<div class="einkauf-kategorie" data-kategorie="${kategorie}">
-        <h4>${kategorie}</h4>`;
+      html += `<div class="einkauf-kategorie" data-kategorie="${kategorie}"><h4>${kategorie}</h4>`;
       for (const item of items) {
         const idx = einkaufItemCount++;
-        html += renderEinkaufItem(idx, item.name, item.menge, item.preis_ca, item.typ || 'extra');
+        html += renderEinkaufItem(idx, item.name, item.menge, item.preis_ca, item.typ || 'fehlend');
       }
       html += '</div>';
     }
@@ -580,31 +625,36 @@ function renderEinkaufItem(idx, name, menge, preis, typ) {
 function addExtraToEinkaufsliste(name, menge, kategorie, preis, btnIdx) {
   const wrapper = document.getElementById('einkaufsliste-wrapper');
   if (!wrapper) return;
-
-  // Passende Kategorie suchen
   const katEls = wrapper.querySelectorAll('.einkauf-kategorie');
   let targetKat = null;
   for (const el of katEls) {
     if (el.dataset.kategorie === kategorie) { targetKat = el; break; }
   }
-
   const idx = einkaufItemCount++;
   const itemHtml = renderEinkaufItem(idx, name, menge, preis, 'extra');
-
   if (targetKat) {
     targetKat.insertAdjacentHTML('beforeend', itemHtml);
   } else {
-    // Neue Kategorie anlegen
     const newKat = document.createElement('div');
     newKat.className = 'einkauf-kategorie';
     newKat.dataset.kategorie = kategorie;
     newKat.innerHTML = `<h4>${kategorie}</h4>${itemHtml}`;
     wrapper.appendChild(newKat);
   }
-
-  // Button deaktivieren
   const btn = document.getElementById('extra-btn-' + btnIdx);
   if (btn) { btn.textContent = '✓ hinzugefügt'; btn.disabled = true; }
+}
+
+function addAllExtraToList() {
+  currentExtraZutaten.forEach((z, i) => {
+    const btn = document.getElementById('extra-btn-' + i);
+    if (btn && !btn.disabled) {
+      const safeKat = (z.kategorie || 'Sonstiges').replace(/'/g, '');
+      addExtraToEinkaufsliste(z.name, z.menge || '1 Stück', safeKat, z.preis_ca || 0, i);
+    }
+  });
+  const allBtn = document.getElementById('add-all-btn');
+  if (allBtn) { allBtn.textContent = '✓ Alle hinzugefügt'; allBtn.disabled = true; }
 }
 
 function toggleCheck(idx) {

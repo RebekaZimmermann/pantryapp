@@ -44,7 +44,6 @@ def after_request(response):
 def index():
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html')
 
-# --- Inventar ---
 @app.route('/inventar', methods=['GET'])
 def get_inventar():
     items = InventarItem.query.order_by(InventarItem.urgency).all()
@@ -74,7 +73,6 @@ def update_inventar(item_id):
     db.session.commit()
     return jsonify({'ok': True})
 
-# --- Historie ---
 @app.route('/historie', methods=['GET'])
 def get_historie():
     rezepte = GekochteRezept.query.order_by(GekochteRezept.gekocht_am.desc()).limit(20).all()
@@ -93,7 +91,6 @@ def add_historie():
     db.session.commit()
     return jsonify({'ok': True})
 
-# --- Rezepte ---
 @app.route('/rezepte', methods=['POST', 'OPTIONS'])
 def rezepte():
     if request.method == 'OPTIONS':
@@ -128,7 +125,6 @@ Format: [{"titel":"Name","zeit":"20 Min","beschreibung":"Kurze Beschreibung","ve
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# --- Kassenbon Scanner ---
 @app.route('/scan', methods=['POST', 'OPTIONS'])
 def scan():
     if request.method == 'OPTIONS':
@@ -165,7 +161,6 @@ Haltbarkeit: soon=Obst/Gemuese/Fleisch/Fisch, week=Milch/Joghurt/Kaese/Brot, lat
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# --- Meal Plan mit Budget & Einkaufsliste ---
 @app.route('/mealplan', methods=['POST', 'OPTIONS'])
 def mealplan():
     if request.method == 'OPTIONS':
@@ -190,10 +185,13 @@ def mealplan():
         key=lambda x: urgency_order[x['urgency']]
     )
 
+    # Dringende Zutaten identifizieren
+    soon_items = [x for x in virtual_inventory if x['urgency'] == 'soon']
+    soon_names = [x['name'] for x in soon_items]
+
     client = OpenAI(api_key=openai_key)
     plan = []
 
-    # Schritt 1: Meal Plan iterativ generieren
     for i in range(total):
         tag = i // mahlzeiten_pro_tag + 1
         mahlzeit_nr = i % mahlzeiten_pro_tag + 1
@@ -205,7 +203,7 @@ def mealplan():
         later = [x for x in virtual_inventory if x['urgency'] == 'later']
 
         inv_parts = []
-        if soon: inv_parts.append('DRINGEND: ' + ', '.join(f"{x['menge']} {x['name']}" for x in soon))
+        if soon: inv_parts.append('DRINGEND (MUSS in Tag 1-2 verwendet werden): ' + ', '.join(f"{x['menge']} {x['name']}" for x in soon))
         if week: inv_parts.append('Diese Woche: ' + ', '.join(f"{x['menge']} {x['name']}" for x in week))
         if later: inv_parts.append('Laenger haltbar: ' + ', '.join(f"{x['menge']} {x['name']}" for x in later))
 
@@ -214,12 +212,24 @@ def mealplan():
 
         already_planned = ', '.join([m['titel'] for m in plan]) if plan else 'keine'
 
+        # Strenge Anweisung fuer fruehe Tage
+        urgency_instruction = ''
+        if tag <= 2 and soon:
+            urgency_instruction = f'\nWICHTIG: Es ist Tag {tag}. Du MUSST mindestens eine DRINGENDE Zutat verwenden: {", ".join(soon_names)}. Diese verfallen sonst!'
+
         try:
             response = client.chat.completions.create(
-                model='gpt-4o', max_tokens=600,
+                model='gpt-4o', max_tokens=800,
                 messages=[
-                    {"role": "system", "content": "Du planst Mahlzeiten fuer eine Person. Generiere GENAU 1 Rezept als JSON. Verwende NUR Zutaten aus dem Inventar plus Wasser/Salz/Pfeffer/Oel. Priorisiere DRINGENDE Zutaten. Antworte NUR mit JSON ohne Text. Format: {\"titel\":\"Name\",\"zeit\":\"20 Min\",\"beschreibung\":\"Kurz\",\"zutaten\":[{\"name\":\"Spinat\",\"menge\":\"ganze Tuete\",\"urgency\":\"soon\"}],\"zubereitung\":\"Schritte\"}"},
-                    {"role": "user", "content": f"Inventar:\n{chr(10).join(inv_parts)}\n\nBereits geplant (nicht wiederholen): {already_planned}\nTag {tag}, {mahlzeit_label}"}
+                    {"role": "system", "content": """Du planst Mahlzeiten fuer eine einzelne Person.
+Generiere GENAU 1 Rezept als JSON Objekt.
+REGELN:
+- Verwende NUR Zutaten aus dem Inventar plus Wasser/Salz/Pfeffer/Oel
+- Dringende Zutaten MUESSEN in den ersten 1-2 Tagen verwendet werden
+- Nicht dasselbe Rezept wiederholen
+- Antworte NUR mit validem JSON ohne Text
+Format: {"titel":"Name","zeit":"20 Min","beschreibung":"Kurze appetitliche Beschreibung","zutaten":[{"name":"Spinat","menge":"ganze Tuete","urgency":"soon"}],"zubereitung":"Schritt 1: ... Schritt 2: ... Schritt 3: ..."}"""},
+                    {"role": "user", "content": f"Inventar:\n{chr(10).join(inv_parts)}\n\nBereits geplant (nicht wiederholen): {already_planned}\nTag {tag} von {tage}, {mahlzeit_label}{urgency_instruction}"}
                 ]
             )
             text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
@@ -235,7 +245,9 @@ def mealplan():
                     if inv_item['name'].lower() == zn:
                         if any(w in zm for w in ['ganz', 'alles', 'alle', 'komplett']):
                             virtual_inventory.remove(inv_item)
-                        elif any(w in zm for w in ['haelfte', 'halb', 'haelfte']):
+                            if inv_item['name'] in soon_names:
+                                soon_names.remove(inv_item['name'])
+                        elif any(w in zm for w in ['haelfte', 'halb']):
                             inv_item['menge'] = 'Haelfte noch'
                             inv_item['urgency'] = 'soon'
                         else:
@@ -245,13 +257,14 @@ def mealplan():
         except Exception as e:
             plan.append({'tag': tag, 'mahlzeit': mahlzeit_label, 'titel': 'Fehler', 'beschreibung': str(e), 'zutaten': [], 'zubereitung': ''})
 
-    # Schritt 2: Extra Zutaten & Einkaufsliste mit Budget
-    einkaufsliste = []
-    extra_zutaten = []
-
+    # Einkaufsliste & Extra-Zutaten
     all_items_text = ', '.join([f"{i.menge} {i.name}" for i in items])
-    plan_text = ', '.join([m['titel'] for m in plan])
-    budget_text = f"Budget: {budget:.2f} EUR" if budget > 0 else "Kein Budget festgelegt"
+    plan_zutaten_text = '\n'.join([f"- {m['titel']}: {', '.join([z['name'] for z in m.get('zutaten',[])])}" for m in plan])
+    budget_text = f"Budget fuer Einkauf: {budget:.2f} EUR" if budget > 0 else "Kein Budget festgelegt"
+
+    einkaufsliste = {}
+    extra_zutaten = []
+    budget_verwendet = 0
 
     try:
         response = client.chat.completions.create(
@@ -263,9 +276,10 @@ Antworte NUR mit validem JSON ohne Text davor/danach.
 STRENGE REGELN:
 - In "einkaufsliste" NUR Zutaten die entweder:
   a) typ "fehlend": im Meal Plan benoetigt aber NICHT im aktuellen Inventar
-  b) typ "extra": explizit in extra_zutaten vorgeschlagen
+  b) typ "extra": explizit in extra_zutaten vorgeschlagen UND vom Nutzer hinzugefuegt
 - KEINE anderen Zutaten erfinden
-- Jede Zutat in extra_zutaten muss auch in einkaufsliste erscheinen wenn sie ins Budget passt
+- extra_zutaten sind VORSCHLAEGE - sie kommen NICHT automatisch auf die Einkaufsliste
+- Schaetze realistische deutsche REWE-Supermarktpreise
 
 Format:
 {
@@ -273,7 +287,7 @@ Format:
     {"name": "Zitrone", "menge": "2 Stueck", "preis_ca": 0.80, "grund": "Wuerde Rezept X deutlich aufwerten", "kategorie": "Obst & Gemuese"}
   ],
   "einkaufsliste": {
-    "Obst & Gemuese": [{"name": "Spinat", "menge": "1 Tuete", "preis_ca": 1.29, "typ": "fehlend"}],
+    "Obst & Gemuese": [{"name": "Tomate", "menge": "3 Stueck", "preis_ca": 1.29, "typ": "fehlend"}],
     "Kuehlregal": [],
     "Tiefkuehl": [],
     "Brot & Backwaren": [],
@@ -281,23 +295,23 @@ Format:
     "Getraenke": [],
     "Sonstiges": []
   },
-  "budget_verwendet": 5.50,
+  "budget_verwendet": 3.50,
   "budget_gesamt": 20.00
 }"""},
-                {"role": "user", "content": f"""Aktuelles Inventar (diese Zutaten sind bereits vorhanden, NICHT auf die Einkaufsliste):
+                {"role": "user", "content": f"""Aktuelles Inventar (bereits vorhanden, NICHT auf Einkaufsliste):
 {all_items_text}
 
 Geplante Mahlzeiten und deren Zutaten:
-{chr(10).join([f"- {m['titel']}: {', '.join([z['name'] for z in m.get('zutaten',[])])}" for m in plan])}
+{plan_zutaten_text}
 
 {budget_text}
 
 Aufgaben:
 1. Finde Zutaten die im Plan vorkommen aber NICHT im Inventar sind (typ: fehlend)
-2. Schlage 2-3 optionale Extra-Zutaten vor die bestehende Rezepte verbessern (typ: extra)
-3. Einkaufsliste = nur fehlende + extra Zutaten, nach REWE-Kategorien sortiert
-4. Halte dich ans Budget: fehlende Zutaten haben Prioritaet
-5. Schaetze realistische deutsche REWE-Supermarktpreise fuer alle Zutaten"""}
+2. Schlage 2-3 optionale Extra-Zutaten vor die Rezepte verbessern wuerden (NUR als Vorschlag, nicht auf Liste)
+3. Einkaufsliste enthaelt NUR fehlende Zutaten (typ: fehlend)
+4. Halte dich ans Budget, fehlende Zutaten haben Prioritaet
+5. Schaetze realistische deutsche REWE-Supermarktpreise"""}
             ]
         )
         text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
@@ -306,11 +320,8 @@ Aufgaben:
         extra_zutaten = einkauf_data.get('extra_zutaten', [])
         budget_verwendet = einkauf_data.get('budget_verwendet', 0)
     except Exception as e:
-        einkaufsliste = {}
-        extra_zutaten = []
-        budget_verwendet = 0
+        pass
 
-    # Plan nach Tagen gruppieren
     grouped = {}
     for m in plan:
         t = m['tag']
