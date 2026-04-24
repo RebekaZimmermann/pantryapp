@@ -195,8 +195,14 @@ def mealplan():
     for i in range(total):
         tag = i // mahlzeiten_pro_tag + 1
         mahlzeit_nr = i % mahlzeiten_pro_tag + 1
-        labels = ['Fruehstueck', 'Mittagessen', 'Abendessen']
-        mahlzeit_label = labels[mahlzeit_nr - 1] if mahlzeiten_pro_tag <= 3 else f'Mahlzeit {mahlzeit_nr}'
+        if mahlzeiten_pro_tag == 1:
+            mahlzeit_label = 'Abendessen'
+        elif mahlzeiten_pro_tag == 2:
+            mahlzeit_label = ['Mittagessen', 'Abendessen'][mahlzeit_nr - 1]
+        elif mahlzeiten_pro_tag == 3:
+            mahlzeit_label = ['Fruehstueck', 'Mittagessen', 'Abendessen'][mahlzeit_nr - 1]
+        else:
+            mahlzeit_label = f'Mahlzeit {mahlzeit_nr}'
 
         soon = [x for x in virtual_inventory if x['urgency'] == 'soon']
         week = [x for x in virtual_inventory if x['urgency'] == 'week']
@@ -304,15 +310,17 @@ Format:
 Geplante Mahlzeiten und deren Zutaten:
 {plan_zutaten_text}
 
+Fehlende Zutaten (bereits auf Einkaufsliste, NICHT als Extra vorschlagen):
+{', '.join(set([z['name'] for m in plan for z in m.get('zutaten', []) if z['name'].lower() not in [i.name.lower() for i in items]]))}
+
 {budget_text}
 
 Aufgaben:
 1. Finde Zutaten die im Plan vorkommen aber NICHT im Inventar sind (typ: fehlend)
-2. Schlage 2-3 optionale Extra-Zutaten vor die Rezepte verbessern wuerden (NUR als Vorschlag, nicht auf Liste)
+2. Schlage 2-3 optionale Extra-Zutaten vor die Rezepte verbessern wuerden - NUR Zutaten die WEDER im Inventar NOCH bereits auf der Einkaufsliste sind
 3. Einkaufsliste enthaelt NUR fehlende Zutaten (typ: fehlend)
 4. Halte dich ans Budget, fehlende Zutaten haben Prioritaet
-5. Schaetze realistische deutsche REWE-Supermarktpreise"""}
-            ]
+5. Schaetze realistische deutsche REWE-Supermarktpreise"""}            ]
         )
         text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
         einkauf_data = json.loads(text)
