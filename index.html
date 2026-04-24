@@ -18,8 +18,8 @@
   .header { background: var(--green); padding: 20px 20px 16px; position: sticky; top: 0; z-index: 10; }
   .header h1 { font-family: 'Fraunces', serif; font-weight: 300; font-size: 22px; color: var(--cream); }
   .header p { font-size: 12px; color: rgba(245,240,232,0.6); margin-top: 2px; }
-  .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--white); position: sticky; top: 64px; z-index: 9; }
-  .tab { flex: 1; padding: 12px 4px; font-size: 12px; font-weight: 500; color: var(--muted); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--white); position: sticky; top: 64px; z-index: 9; overflow-x: auto; }
+  .tab { flex-shrink: 0; padding: 12px 10px; font-size: 12px; font-weight: 500; color: var(--muted); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
   .tab.active { color: var(--green); border-bottom-color: var(--green); }
   .content { padding: 16px; }
   .section { display: none; } .section.active { display: block; }
@@ -29,12 +29,12 @@
   .add-form { background: var(--cream); border-radius: 12px; padding: 14px; margin-bottom: 16px; border: 1px solid var(--border); }
   .add-form h3 { font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
   .form-row { margin-bottom: 8px; }
-  input[type=text], input[type=password] { font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--white); color: var(--text); width: 100%; outline: none; }
+  input[type=text], input[type=password], input[type=number] { font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--white); color: var(--text); width: 100%; outline: none; }
   input:focus { border-color: var(--green-light); }
   .btn { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; transition: all 0.15s; }
   .btn-primary { background: var(--green); color: var(--cream); } .btn-primary:hover { background: var(--green-light); }
   .btn-secondary { background: var(--border); color: var(--text); }
-  .btn-orange { background: var(--orange); color: white; width: 100%; margin-top: 4px; font-size: 15px; padding: 13px; }
+  .btn-orange { background: var(--orange); color: white; width: 100%; font-size: 15px; padding: 13px; }
   .btn-save { background: #F59E0B; color: white; padding: 8px 12px; font-size: 13px; border-radius: 7px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500; white-space: nowrap; }
   .urgency-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
   .urgency-row { display: flex; gap: 6px; margin-bottom: 10px; }
@@ -72,24 +72,43 @@
   .api-row { display: flex; gap: 8px; }
   .api-row input { flex: 1; font-size: 13px; padding: 8px 10px; border: 1px solid #F59E0B; border-radius: 7px; background: white; font-family: 'DM Sans', sans-serif; outline: none; }
   .api-saved { font-size: 11px; color: #166534; margin-top: 5px; }
-
-  /* Barcode Scanner Modal */
+  .plan-card { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+  .plan-mahlzeit { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .plan-titel { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+  .plan-desc { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .plan-zutaten { font-size: 12px; color: var(--green); }
+  .day-header { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 14px 0 8px; }
+  .einkauf-kategorie { margin-bottom: 14px; }
+  .einkauf-kategorie h4 { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .einkauf-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--cream); font-size: 13px; }
+  .einkauf-item.checked { opacity: 0.4; text-decoration: line-through; }
+  .einkauf-name { flex: 1; }
+  .einkauf-menge { color: var(--muted); font-size: 12px; margin-right: 8px; }
+  .einkauf-preis { color: var(--green); font-weight: 500; font-size: 12px; margin-right: 8px; }
+  .einkauf-typ-fehlend { font-size: 10px; background: var(--orange-pale); color: var(--orange); padding: 2px 5px; border-radius: 4px; }
+  .einkauf-typ-extra { font-size: 10px; background: var(--green-pale); color: var(--green); padding: 2px 5px; border-radius: 4px; }
+  .budget-bar { background: var(--green-pale); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+  .budget-row { display: flex; justify-content: space-between; font-size: 13px; }
+  .budget-total { font-weight: 500; color: var(--green); }
+  .budget-progress { height: 6px; background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .budget-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.3s; }
+  .budget-fill.over { background: var(--orange); }
+  .extra-card { background: var(--cream); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .extra-name { font-size: 14px; font-weight: 500; }
+  .extra-grund { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .extra-preis { font-size: 12px; color: var(--green); font-weight: 500; }
+  .section-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 8px; }
   .barcode-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .barcode-modal h3 { color: white; font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 8px; }
   .barcode-modal p { color: rgba(255,255,255,0.6); font-size: 13px; margin-bottom: 16px; }
   #barcode-viewport { width: 300px; height: 220px; position: relative; border-radius: 12px; overflow: hidden; }
   #barcode-viewport video { width: 100%; height: 100%; object-fit: cover; }
-  #barcode-viewport canvas { position: absolute; top: 0; left: 0; }
   .scan-line { position: absolute; left: 0; right: 0; height: 2px; background: var(--orange); animation: scanline 2s infinite; z-index: 10; }
   @keyframes scanline { 0% { top: 10%; } 50% { top: 85%; } 100% { top: 10%; } }
-  .barcode-close { margin-top: 20px; }
-
-  /* Produkt Bestätigung Modal */
   .product-modal { position: fixed; inset: 0; background: rgba(26,26,20,0.6); display: flex; align-items: flex-end; z-index: 300; padding: 16px; }
   .product-sheet { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; }
   .product-sheet h3 { font-family: 'Fraunces', serif; font-size: 18px; margin-bottom: 4px; }
-  .product-sheet .product-name { font-size: 16px; font-weight: 500; color: var(--green); margin-bottom: 14px; }
-
+  .product-name { font-size: 16px; font-weight: 500; color: var(--green); margin-bottom: 14px; }
   .cooked-modal { position: fixed; inset: 0; background: rgba(26,26,20,0.5); display: flex; align-items: flex-end; z-index: 100; padding: 16px; }
   .cooked-sheet { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-height: 80vh; overflow-y: auto; }
   .cooked-sheet h3 { font-family: 'Fraunces', serif; font-size: 18px; margin-bottom: 4px; }
@@ -101,6 +120,8 @@
   .amount-btn.selected { background: var(--green); color: white; border-color: var(--green); }
   .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
   .modal-actions .btn { flex: 1; }
+  .checkbox { width: 18px; height: 18px; border-radius: 4px; border: 1.5px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .checkbox.checked { background: var(--green); border-color: var(--green); color: white; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -112,6 +133,7 @@
   <div class="tabs">
     <button class="tab active" onclick="showTab('inventar',this)">Inventar</button>
     <button class="tab" onclick="showTab('rezepte',this)">Rezepte</button>
+    <button class="tab" onclick="showTab('mealplan',this)">🗓 Plan</button>
     <button class="tab" onclick="showTab('historie',this)">Historie</button>
     <button class="tab" onclick="showTab('einstellungen',this)">⚙️</button>
   </div>
@@ -122,16 +144,11 @@
       <div class="scan-bar">
         <label>Hinzufügen via Scanner</label>
         <div class="scan-buttons">
-          <button class="btn btn-primary" id="barcode-btn" style="flex:1" onclick="openBarcodeScanner()">
-            🔍 Barcode scannen
-          </button>
+          <button class="btn btn-primary" id="barcode-btn" style="flex:1" onclick="openBarcodeScanner()">🔍 Barcode</button>
           <input type="file" id="bon-input" accept="image/*" capture="environment" style="display:none" onchange="scanBon(this)">
-          <button class="btn btn-secondary" id="scan-btn" style="flex:1" onclick="document.getElementById('bon-input').click()">
-            📷 Kassenbon
-          </button>
+          <button class="btn btn-secondary" id="scan-btn" style="flex:1" onclick="document.getElementById('bon-input').click()">📷 Kassenbon</button>
         </div>
       </div>
-
       <div class="add-form">
         <h3>Manuell hinzufügen</h3>
         <div class="form-row"><input type="text" id="zutat-name" placeholder="z.B. Spinat, Eier, Hackfleisch..." /></div>
@@ -144,17 +161,39 @@
         </div>
         <button class="btn btn-primary" onclick="addItem()" style="width:100%">+ Hinzufügen</button>
       </div>
-
       <div id="inventory-list" class="inventory-list">
-        <div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.<br>Scanne einen Barcode oder fotografiere deinen Kassenbon!</p></div>
+        <div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.</p></div>
       </div>
     </div>
 
     <!-- REZEPTE -->
     <div id="tab-rezepte" class="section">
-      <div class="recipe-intro">Basierend auf deinem Inventar generiere ich Rezepte die zuerst aufbrauchen was bald weg muss.</div>
+      <div class="recipe-intro">Basierend auf deinem Inventar – priorisiert was bald weg muss.</div>
       <button class="btn btn-orange" onclick="generateRecipes()">🍳 Rezepte generieren</button>
       <div id="recipes-container" style="margin-top:16px"></div>
+    </div>
+
+    <!-- MEAL PLAN -->
+    <div id="tab-mealplan" class="section">
+      <div style="background:var(--green-pale);border-radius:12px;padding:14px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:500;color:var(--green);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Plan erstellen</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Tage</div>
+            <input type="number" id="plan-tage" value="5" min="1" max="14" style="text-align:center" />
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Mahlzeiten/Tag</div>
+            <input type="number" id="plan-mahlzeiten" value="2" min="1" max="3" style="text-align:center" />
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Budget (€)</div>
+            <input type="number" id="plan-budget" value="0" min="0" step="5" style="text-align:center" placeholder="0 = kein" />
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width:100%" onclick="generateMealPlan()">🗓 Plan generieren</button>
+      </div>
+      <div id="mealplan-container"></div>
     </div>
 
     <!-- HISTORIE -->
@@ -179,17 +218,15 @@
   </div>
 </div>
 
-<!-- Barcode Scanner Modal -->
+<!-- Barcode Modal -->
 <div id="barcode-modal" class="barcode-modal" style="display:none">
   <h3>Barcode scannen</h3>
   <p>Halte die Kamera auf den Barcode</p>
-  <div id="barcode-viewport">
-    <div class="scan-line"></div>
-  </div>
-  <button class="btn btn-secondary barcode-close" onclick="closeBarcodeScanner()">Abbrechen</button>
+  <div id="barcode-viewport"><div class="scan-line"></div></div>
+  <button class="btn btn-secondary" style="margin-top:20px" onclick="closeBarcodeScanner()">Abbrechen</button>
 </div>
 
-<!-- Produkt Bestätigung Modal -->
+<!-- Produkt Modal -->
 <div id="product-modal" class="product-modal" style="display:none">
   <div class="product-sheet">
     <h3>Produkt gefunden</h3>
@@ -225,13 +262,11 @@
 let inventory = [], selectedUrgency = null, selectedProductUrgency = null;
 let currentRecipe = null, cookedSelections = {};
 let currentProductName = '', lastScannedCode = '';
+let codeReader = null;
+let checkedItems = new Set();
 
-// --- Init ---
-async function init() {
-  await loadInventar();
-}
+async function init() { await loadInventar(); }
 
-// --- Inventar ---
 async function loadInventar() {
   const res = await fetch('/inventar');
   inventory = await res.json();
@@ -242,11 +277,7 @@ async function addItem() {
   const name = document.getElementById('zutat-name').value.trim();
   const menge = document.getElementById('zutat-menge').value.trim();
   if (!name || !menge || !selectedUrgency) { alert('Bitte Name, Menge und Haltbarkeit angeben!'); return; }
-  const res = await fetch('/inventar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, menge, urgency: selectedUrgency })
-  });
+  const res = await fetch('/inventar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, menge, urgency: selectedUrgency }) });
   const item = await res.json();
   inventory.push(item);
   document.getElementById('zutat-name').value = '';
@@ -272,7 +303,7 @@ function renderInventory() {
   const list = document.getElementById('inventory-list');
   const soonCount = inventory.filter(i => i.urgency === 'soon').length;
   document.getElementById('inv-summary').textContent = inventory.length + ' Zutat' + (inventory.length !== 1 ? 'en' : '') + ' im Inventar' + (soonCount > 0 ? ' · ' + soonCount + ' bald ablaufend' : '');
-  if (inventory.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.<br>Scanne einen Barcode!</p></div>'; return; }
+  if (inventory.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">🛒</div><p>Noch nichts im Inventar.</p></div>'; return; }
   const order = { soon: 0, week: 1, later: 2 };
   list.innerHTML = [...inventory].sort((a,b) => order[a.urgency]-order[b.urgency]).map(item => `
     <div class="inv-item">
@@ -285,29 +316,21 @@ function renderInventory() {
     </div>`).join('');
 }
 
-// --- Barcode Scanner ---
-let codeReader = null;
-
+// Barcode Scanner
 async function openBarcodeScanner() {
   document.getElementById('barcode-modal').style.display = 'flex';
   lastScannedCode = '';
-
   try {
     codeReader = new ZXing.BrowserMultiFormatReader();
     const videoEl = document.createElement('video');
-    videoEl.style.width = '100%';
-    videoEl.style.height = '100%';
-    videoEl.style.objectFit = 'cover';
+    videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover';
     const viewport = document.getElementById('barcode-viewport');
-    // Scan-Linie erhalten
     const scanLine = viewport.querySelector('.scan-line');
     viewport.innerHTML = '';
     viewport.appendChild(videoEl);
     viewport.appendChild(scanLine);
-
     await codeReader.decodeFromConstraints(
-      { video: { facingMode: 'environment' } },
-      videoEl,
+      { video: { facingMode: 'environment' } }, videoEl,
       async (result, err) => {
         if (result) {
           const code = result.getText();
@@ -318,10 +341,7 @@ async function openBarcodeScanner() {
         }
       }
     );
-  } catch(e) {
-    alert('Kamera konnte nicht geöffnet werden: ' + e.message);
-    closeBarcodeScanner();
-  }
+  } catch(e) { alert('Kamera konnte nicht geöffnet werden: ' + e.message); closeBarcodeScanner(); }
 }
 
 function closeBarcodeScanner() {
@@ -334,18 +354,10 @@ async function lookupBarcode(code) {
     const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
     const data = await res.json();
     if (data.status === 1 && data.product) {
-      const product = data.product;
-      const name = product.product_name_de || product.product_name || product.generic_name || 'Unbekanntes Produkt';
-      showProductModal(name);
-    } else {
-      // Produkt nicht gefunden – manuell eingeben lassen
-      showProductModal('');
-      document.getElementById('product-name').textContent = 'Produkt nicht gefunden (Barcode: ' + code + ')';
-    }
-  } catch(e) {
-    showProductModal('');
-    document.getElementById('product-name').textContent = 'Produktsuche fehlgeschlagen';
-  }
+      const p = data.product;
+      showProductModal(p.product_name_de || p.product_name || p.generic_name || 'Unbekannt');
+    } else { showProductModal(''); document.getElementById('product-name').textContent = 'Nicht gefunden (Code: ' + code + ')'; }
+  } catch(e) { showProductModal(''); }
 }
 
 function showProductModal(name) {
@@ -353,7 +365,7 @@ function showProductModal(name) {
   document.getElementById('product-name').textContent = name || 'Bitte Namen eingeben';
   document.getElementById('product-menge').value = '';
   selectedProductUrgency = null;
-  document.querySelectorAll('[id^="p-urg-"]').forEach(b => { b.className = 'urgency-btn'; });
+  document.querySelectorAll('[id^="p-urg-"]').forEach(b => b.className = 'urgency-btn');
   document.getElementById('product-modal').style.display = 'flex';
 }
 
@@ -363,57 +375,38 @@ function selectProductUrgency(u) {
   document.getElementById('p-urg-' + u).className = 'urgency-btn selected-' + u;
 }
 
-function closeProductModal() {
-  document.getElementById('product-modal').style.display = 'none';
-}
+function closeProductModal() { document.getElementById('product-modal').style.display = 'none'; }
 
 async function confirmProduct() {
-  const name = currentProductName || document.getElementById('zutat-name').value.trim();
+  const name = currentProductName || 'Unbekannt';
   const menge = document.getElementById('product-menge').value.trim() || '1 Stück';
-  if (!name) { alert('Bitte Produktname eingeben!'); return; }
   if (!selectedProductUrgency) { alert('Bitte Haltbarkeit auswählen!'); return; }
-  const res = await fetch('/inventar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, menge, urgency: selectedProductUrgency })
-  });
+  const res = await fetch('/inventar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, menge, urgency: selectedProductUrgency }) });
   const item = await res.json();
   inventory.push(item);
   renderInventory();
   closeProductModal();
 }
 
-// --- Kassenbon Scanner ---
+// Kassenbon
 async function scanBon(input) {
-  const file = input.files[0];
-  if (!file) return;
+  const file = input.files[0]; if (!file) return;
   const btn = document.getElementById('scan-btn');
-  btn.textContent = '⏳ Wird gescannt...';
-  btn.disabled = true;
+  btn.textContent = '⏳ Scannt...'; btn.disabled = true;
   const reader = new FileReader();
   reader.onload = async function(e) {
-    const base64 = e.target.result.split(',')[1];
     try {
-      const response = await fetch('/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64 })
-      });
-      const data = await response.json();
+      const res = await fetch('/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: e.target.result.split(',')[1] }) });
+      const data = await res.json();
       if (data.error) throw new Error(data.error);
       await loadInventar();
       btn.textContent = '✓ ' + data.items.length + ' erkannt!';
       setTimeout(() => { btn.textContent = '📷 Kassenbon'; btn.disabled = false; }, 3000);
-    } catch(e) {
-      alert('Fehler: ' + e.message);
-      btn.textContent = '📷 Kassenbon';
-      btn.disabled = false;
-    }
+    } catch(e) { alert('Fehler: ' + e.message); btn.textContent = '📷 Kassenbon'; btn.disabled = false; }
   };
   reader.readAsDataURL(file);
 }
 
-// --- Tabs ---
 function showTab(tab, el) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -422,7 +415,7 @@ function showTab(tab, el) {
   if (tab === 'historie') loadHistorie();
 }
 
-// --- Rezepte ---
+// Rezepte
 async function generateRecipes() {
   if (inventory.length === 0) { alert('Füge zuerst Zutaten ein!'); return; }
   const container = document.getElementById('recipes-container');
@@ -436,11 +429,7 @@ async function generateRecipes() {
     laterItems.length > 0 ? 'Länger haltbar: ' + laterItems.map(i => i.menge + ' ' + i.name).join(', ') : ''
   ].filter(Boolean).join('\n');
   try {
-    const res = await fetch('/rezepte', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inventory_text: inventoryText })
-    });
+    const res = await fetch('/rezepte', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inventory_text: inventoryText }) });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     renderRecipes(data.recipes);
@@ -467,7 +456,128 @@ function renderRecipes(recipes) {
     </div>`).join('');
 }
 
-// --- Gekocht Modal ---
+// Meal Plan
+async function generateMealPlan() {
+  const tage = parseInt(document.getElementById('plan-tage').value);
+  const mahlzeiten = parseInt(document.getElementById('plan-mahlzeiten').value);
+  const budget = parseFloat(document.getElementById('plan-budget').value) || 0;
+  const total = tage * mahlzeiten;
+  const container = document.getElementById('mealplan-container');
+  const secs = total * 4 + 10;
+  container.innerHTML = `<div class="loading">Plan wird generiert – ca. ${secs} Sekunden<span class="loading-dots"></span></div>`;
+  try {
+    const res = await fetch('/mealplan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tage, mahlzeiten, budget }) });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderMealPlan(data);
+  } catch(e) {
+    container.innerHTML = `<div class="empty-state"><div class="emoji">😕</div><p>Fehler: ${e.message}</p></div>`;
+  }
+}
+
+function renderMealPlan(data) {
+  const { plan, tage, einkaufsliste, extra_zutaten, budget, budget_verwendet } = data;
+  const days = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const today = new Date().getDay();
+  checkedItems = new Set();
+  let html = '';
+
+  // Meal Plan
+  html += '<div class="section-label">Dein Wochenplan</div>';
+  for (let t = 1; t <= tage; t++) {
+    const mahlzeiten = plan[t] || [];
+    const dayLabel = days[(today + t - 2) % 7];
+    html += `<div class="day-header">Tag ${t} · ${dayLabel}</div>`;
+    for (const m of mahlzeiten) {
+      const urgentCount = (m.zutaten || []).filter(z => z.urgency === 'soon').length;
+      html += `<div class="plan-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="plan-mahlzeit">${m.mahlzeit}</div>
+          ${urgentCount > 0 ? `<span style="font-size:10px;background:var(--orange-pale);color:var(--orange);padding:2px 6px;border-radius:10px;font-weight:500">🔴 ${urgentCount} dringend</span>` : ''}
+        </div>
+        <div class="plan-titel">${m.titel}</div>
+        <div class="plan-desc">${m.beschreibung || ''}</div>
+        <div class="plan-zutaten">${(m.zutaten || []).map(z => z.name).join(' · ')}</div>
+      </div>`;
+    }
+  }
+
+  // Extra Zutaten
+  if (extra_zutaten && extra_zutaten.length > 0) {
+    html += '<div class="section-label" style="margin-top:20px">✨ Empfohlene Extra-Zutaten</div>';
+    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Diese Zutaten würden deine Rezepte deutlich aufwerten</div>';
+    for (const z of extra_zutaten) {
+      html += `<div class="extra-card">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <div class="extra-name">${z.name} <span style="font-size:12px;color:var(--muted);font-weight:400">· ${z.menge}</span></div>
+            <div class="extra-grund">${z.grund}</div>
+          </div>
+          <div class="extra-preis">ca. ${z.preis_ca ? z.preis_ca.toFixed(2) + ' €' : '–'}</div>
+        </div>
+      </div>`;
+    }
+  }
+
+  // Budget Bar
+  if (budget > 0) {
+    const pct = Math.min((budget_verwendet / budget) * 100, 100);
+    const over = budget_verwendet > budget;
+    html += `<div class="section-label" style="margin-top:20px">💰 Budget</div>
+    <div class="budget-bar">
+      <div class="budget-row">
+        <span>Geplante Ausgaben</span>
+        <span class="budget-total" style="${over ? 'color:var(--orange)' : ''}">${budget_verwendet.toFixed(2)} € / ${budget.toFixed(2)} €</span>
+      </div>
+      <div class="budget-progress"><div class="budget-fill${over ? ' over' : ''}" style="width:${pct}%"></div></div>
+      ${over ? '<div style="font-size:11px;color:var(--orange);margin-top:4px">Budget überschritten – einige Extra-Zutaten entfernen?</div>' : ''}
+    </div>`;
+  }
+
+  // Einkaufsliste
+  html += '<div class="section-label" style="margin-top:20px">🛒 Einkaufsliste</div>';
+  const kategorien = Object.entries(einkaufsliste || {}).filter(([k, v]) => v && v.length > 0);
+  if (kategorien.length === 0) {
+    html += '<div style="font-size:13px;color:var(--muted);padding:12px 0">Du hast alles – kein Einkauf nötig! 🎉</div>';
+  } else {
+    let itemIndex = 0;
+    for (const [kategorie, items] of kategorien) {
+      html += `<div class="einkauf-kategorie">
+        <h4>${kategorie}</h4>`;
+      for (const item of items) {
+        const idx = itemIndex++;
+        html += `<div class="einkauf-item" id="einkauf-${idx}">
+          <div class="checkbox" id="cb-${idx}" onclick="toggleCheck(${idx})"></div>
+          <div class="einkauf-name" style="margin-left:8px">${item.name}</div>
+          <div class="einkauf-menge">${item.menge}</div>
+          <div class="einkauf-preis">${item.preis_ca ? item.preis_ca.toFixed(2) + ' €' : ''}</div>
+          <div class="einkauf-typ-${item.typ || 'extra'}">${item.typ === 'fehlend' ? 'fehlt' : 'extra'}</div>
+        </div>`;
+      }
+      html += '</div>';
+    }
+  }
+
+  document.getElementById('mealplan-container').innerHTML = html;
+}
+
+function toggleCheck(idx) {
+  const item = document.getElementById('einkauf-' + idx);
+  const cb = document.getElementById('cb-' + idx);
+  if (checkedItems.has(idx)) {
+    checkedItems.delete(idx);
+    item.classList.remove('checked');
+    cb.classList.remove('checked');
+    cb.textContent = '';
+  } else {
+    checkedItems.add(idx);
+    item.classList.add('checked');
+    cb.classList.add('checked');
+    cb.textContent = '✓';
+  }
+}
+
+// Gekocht Modal
 function openCookedModal(recipe) {
   currentRecipe = recipe; cookedSelections = {};
   document.getElementById('cooked-title').textContent = recipe.titel + ' gekocht!';
@@ -501,24 +611,15 @@ async function confirmCooked() {
     if (amount === 'alles') {
       await fetch('/inventar/' + item.id, { method: 'DELETE' });
     } else if (amount === 'haelfte' || amount === 'wenig') {
-      await fetch('/inventar/' + item.id, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ menge: amount === 'haelfte' ? 'ca. die Hälfte noch' : 'wenig übrig', urgency: 'soon' })
-      });
+      await fetch('/inventar/' + item.id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ menge: amount === 'haelfte' ? 'ca. die Hälfte noch' : 'wenig übrig', urgency: 'soon' }) });
     }
   }
-  await fetch('/historie', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ titel: currentRecipe.titel, zutaten: currentRecipe.zutaten })
-  });
+  await fetch('/historie', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titel: currentRecipe.titel, zutaten: currentRecipe.zutaten }) });
   await loadInventar();
   closeModal();
   alert('Gespeichert! 🎉');
 }
 
-// --- Historie ---
 async function loadHistorie() {
   const res = await fetch('/historie');
   const data = await res.json();
@@ -531,15 +632,10 @@ async function loadHistorie() {
     </div>`).join('');
 }
 
-// --- Einstellungen ---
 async function saveApiKey() {
   const key = document.getElementById('api-key-input').value.trim();
   if (!key) return;
-  await fetch('/settings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ openai_key: key })
-  });
+  await fetch('/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ openai_key: key }) });
   document.getElementById('api-saved').textContent = '✓ API Key gespeichert';
   document.getElementById('api-key-input').value = '';
 }
