@@ -838,7 +838,8 @@ Küchen bisher vertreten: {', '.join(used_cuisines) if used_cuisines else 'keine
 Mahlzeit: Tag {tag} von {tage}, {mahlzeit_label}{meal_prep_hinweis}
 {f'Bevorzugte Küche für dieses Gericht: {next_cuisine}' if next_cuisine else ''}
 
-Realistische Portionsgröße für 1 Person. Abwechslungsreich zu bisherigen Gerichten."""}
+Realistische Portionsgröße für 1 Person. Abwechslungsreich zu bisherigen Gerichten.
+WICHTIG: Nur Zutaten kombinieren die kulinarisch wirklich zusammenpassen. Kein Käse in Obstspeisen, kein Parmesan in Pancakes etc."""}
                         ]
                     )
             else:
@@ -870,18 +871,20 @@ Realistische Portionsgröße für 1 Person. Abwechslungsreich zu bisherigen Geri
                         {"role": "system", "content": f"""Du planst Mahlzeiten für eine Person.
 Generiere GENAU 1 Rezept als JSON.
 ERNÄHRUNG: {ernaehrung_text} – STRIKT einhalten.
+{fleisch_einschraenkung if 'fleisch_einschraenkung' in dir() else ''}
 SCHWIERIGKEIT: {schwierigkeit_text}
 {cuisines_text}
 {mag_nicht_text}
 {mag_text}
 REGELN:
-- Verwende NUR Zutaten aus dem Inventar plus Wasser/Salz/Pfeffer/Öl
-- Dringende Zutaten priorisieren
+- Verwende Zutaten aus dem Inventar NUR wenn sie kulinarisch sinnvoll zusammenpassen
+- NIEMALS Zutaten kombinieren die nicht zusammengehören (z.B. Parmesan in Pancakes, Käse in Obstsalat)
+- Dringende Zutaten priorisieren, aber nur wenn sie zum Gericht passen
 - Abwechslungsreich – nicht dasselbe wie bereits geplant
-- Korrekte deutsche Umlaute
-- NUR JSON
+- Realistische Portionsgrößen für 1 Person
+- Korrekte deutsche Umlaute, NUR JSON
 Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","kueche":"deutsch","zutaten":[{{"name":"Spinat","menge":"ganze Tüte","urgency":"soon","kaufen":false}}],"zubereitung":"Schritt 1: ...","naehrstoffe":{{"kalorien":400,"protein":25,"kohlenhydrate":40,"fett":12}}}}"""},
-                        {"role": "user", "content": f"Inventar:\n{chr(10).join(inv_parts)}\n\nBereits geplant: {already_planned}\nTag {tag} von {tage}, {mahlzeit_label}{urgency_instruction}{kein_einkauf_hinweis}"}
+                        {"role": "user", "content": f"Inventar:\n{chr(10).join(inv_parts)}\n\nBereits geplant: {already_planned}\nTag {tag} von {tage}, {mahlzeit_label}{urgency_instruction}{kein_einkauf_hinweis}\n\nWichtig: Nur Zutaten verwenden die geschmacklich wirklich zusammenpassen!"}
                     ]
                 )
 
