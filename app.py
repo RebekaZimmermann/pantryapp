@@ -595,8 +595,8 @@ def mealplan():
         week = [x for x in virtual_inventory if x['urgency'] == 'week']
         later = [x for x in virtual_inventory if x['urgency'] == 'later']
 
-        # Phase bestimmen
-        phase1 = len(soon_names) > 0
+        # Phase bestimmen: Phase 1 wenn dringende Zutaten ODER Budget=0 (kein Einkauf)
+        phase1 = len(soon_names) > 0 or budget == 0
         phase2 = not phase1
 
         already_planned = ', '.join(set([m['titel'] for m in plan])) if plan else 'keine'
@@ -760,8 +760,12 @@ Realistische Portionsgröße für 1 Person. Abwechslungsreich zu bisherigen Geri
                 if later: inv_parts.append('Länger haltbar: ' + ', '.join(f"{x['menge']} {x['name']}" for x in later))
 
                 urgency_instruction = ''
-                if soon:
+                if soon and budget > 0:
                     urgency_instruction = f'\nWICHTIG: MUSS dringende Zutat verwenden: {", ".join(soon_names)}'
+                elif soon:
+                    urgency_instruction = f'\nBevorzuge dringende Zutaten: {", ".join(soon_names)}'
+
+                kein_einkauf_hinweis = "\nKEIN EINKAUF: Verwende ausschließlich Zutaten aus dem Inventar. Keine neuen Zutaten kaufen." if budget == 0 else ""
 
                 response = client.chat.completions.create(
                     model='gpt-4o', max_tokens=800,
@@ -770,16 +774,17 @@ Realistische Portionsgröße für 1 Person. Abwechslungsreich zu bisherigen Geri
 Generiere GENAU 1 Rezept als JSON.
 ERNÄHRUNG: {ernaehrung_text} – STRIKT einhalten.
 SCHWIERIGKEIT: {schwierigkeit_text}
+{cuisines_text}
 {mag_nicht_text}
 {mag_text}
 REGELN:
 - Verwende NUR Zutaten aus dem Inventar plus Wasser/Salz/Pfeffer/Öl
-- Dringende Zutaten MÜSSEN verwendet werden
-- Nicht wiederholen
+- Dringende Zutaten priorisieren
+- Abwechslungsreich – nicht dasselbe wie bereits geplant
 - Korrekte deutsche Umlaute
 - NUR JSON
-Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","zutaten":[{{"name":"Spinat","menge":"ganze Tüte","urgency":"soon","kaufen":false}}],"zubereitung":"Schritt 1: ..."}}"""},
-                        {"role": "user", "content": f"Inventar:\n{chr(10).join(inv_parts)}\n\nBereits geplant: {already_planned}\nTag {tag} von {tage}, {mahlzeit_label}{urgency_instruction}"}
+Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","kueche":"deutsch","zutaten":[{{"name":"Spinat","menge":"ganze Tüte","urgency":"soon","kaufen":false}}],"zubereitung":"Schritt 1: ...","naehrstoffe":{{"kalorien":400,"protein":25,"kohlenhydrate":40,"fett":12}}}}"""},
+                        {"role": "user", "content": f"Inventar:\n{chr(10).join(inv_parts)}\n\nBereits geplant: {already_planned}\nTag {tag} von {tage}, {mahlzeit_label}{urgency_instruction}{kein_einkauf_hinweis}"}
                     ]
                 )
 
