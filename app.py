@@ -718,12 +718,22 @@ Snack für Tag {tag}. Einfach, gesund, mit Obst wenn möglich."""}
                         unused = [c for c in cuisines if c not in used_cuisines]
                         next_cuisine = unused[0] if unused else cuisines[i % len(cuisines)]
 
+                    # Explizite Fleisch-Einschränkung für Phase 2
+                    fleisch_einschraenkung = ""
+                    if ernaehrung == 'kein_rohes_fleisch':
+                        fleisch_einschraenkung = "FLEISCH: Kein rohes Fleisch zum Selberzubereiten (kein Hackfleisch, keine rohe Hähnchenbrust, kein rohes Rindfleisch). Erlaubt: Aufschnitt, Bacon, Würstchen, TK-Geflügel (vorgegart), Fischstäbchen."
+                    elif ernaehrung == 'vegetarisch':
+                        fleisch_einschraenkung = "KEIN Fleisch, KEIN Fisch – STRIKT einhalten."
+                    elif ernaehrung == 'vegan':
+                        fleisch_einschraenkung = "KEINE tierischen Produkte – STRIKT einhalten."
+
                     response = client.chat.completions.create(
                         model='gpt-4o', max_tokens=900,
                         messages=[
                             {"role": "system", "content": f"""Du planst Mahlzeiten für eine Person in Deutschland. Generiere GENAU 1 Rezept als JSON.
 
 ERNÄHRUNG: {ernaehrung_text} – STRIKT einhalten.
+{fleisch_einschraenkung}
 SCHWIERIGKEIT: {schwierigkeit_text}
 {cuisines_text}
 {mag_nicht_text}
@@ -754,10 +764,18 @@ Realistische Portionsgröße für 1 Person. Abwechslungsreich zu bisherigen Geri
                     )
             else:
                 # Phase 1: Nur Inventar verwenden, dringendes zuerst
+                # Originale Mengen aus DB verwenden, nicht "wenig übrig" aus virtualem Inventar
+                orig_mengen = {i.name.lower(): i.menge for i in items}
+                def clean_menge(item):
+                    orig = orig_mengen.get(item['name'].lower(), item['menge'])
+                    if orig.lower().startswith('wenig') or orig.lower().startswith('ca. hälfte'):
+                        return item['menge']  # fallback
+                    return orig
+
                 inv_parts = []
-                if soon: inv_parts.append('DRINGEND (MUSS verwendet werden): ' + ', '.join(f"{x['menge']} {x['name']}" for x in soon))
-                if week: inv_parts.append('Diese Woche: ' + ', '.join(f"{x['menge']} {x['name']}" for x in week))
-                if later: inv_parts.append('Länger haltbar: ' + ', '.join(f"{x['menge']} {x['name']}" for x in later))
+                if soon: inv_parts.append('DRINGEND: ' + ', '.join(f"{clean_menge(x)} {x['name']}" for x in soon))
+                if week: inv_parts.append('Diese Woche: ' + ', '.join(f"{clean_menge(x)} {x['name']}" for x in week))
+                if later: inv_parts.append('Länger haltbar: ' + ', '.join(f"{clean_menge(x)} {x['name']}" for x in later))
 
                 urgency_instruction = ''
                 if soon and budget > 0:
