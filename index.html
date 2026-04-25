@@ -1657,14 +1657,41 @@ function confirmPlanRezeptDirekt(rezeptId, btn) {
   const m = planCards[idx];
   if (!m) return;
 
-  // Rezept in den Slot einsetzen
-  planCards[idx] = { ...m, titel: r.titel, beschreibung: r.beschreibung || '', zutaten: r.zutaten || [], zubereitung: r.zubereitung || '', quelle: 'gespeichert', naehrstoffe: r.naehrstoffe || {} };
+  const neuesRezept = { ...m, titel: r.titel, beschreibung: r.beschreibung || '', zutaten: r.zutaten || [], zubereitung: r.zubereitung || '', quelle: 'gespeichert', naehrstoffe: r.naehrstoffe || {} };
+  planCards[idx] = neuesRezept;
+
+  const mealPrepAktiv = document.getElementById('meal-prep-toggle')?.checked;
+  const istAbendessen = m.mahlzeit === 'Abendessen';
+
+  // Meal Prep: Wenn Abendessen → nächsten Mittag ebenfalls ersetzen
+  if (mealPrepAktiv && istAbendessen) {
+    const nextTag = m.tag + 1;
+    const nextMittagEntry = Object.entries(planCards).find(
+      ([i, mc]) => parseInt(i) !== idx && mc.tag === nextTag && mc.mahlzeit === 'Mittagessen'
+    );
+    if (nextMittagEntry) {
+      const [nextIdx] = nextMittagEntry;
+      planCards[nextIdx] = { ...neuesRezept, tag: nextTag, mahlzeit: 'Mittagessen', quelle: 'meal_prep', meal_prep_von: r.titel };
+      const nextCard = document.getElementById('card-' + nextIdx);
+      if (nextCard) {
+        const nt = nextCard.querySelector('.plan-titel');
+        const nd = nextCard.querySelector('.plan-desc');
+        const nz = nextCard.querySelector('.plan-zutaten');
+        const nm = nextCard.querySelector('.plan-mahlzeit');
+        if (nt) nt.textContent = r.titel;
+        if (nd) nd.textContent = r.beschreibung || '';
+        if (nz) nz.textContent = (r.zutaten||[]).map(z=>z.name).join(' · ');
+        if (nm) nm.innerHTML = `Mittagessen · <span style="color:#0369A1;font-size:10px">🍱</span>`;
+      }
+    }
+  }
 
   // Card DOM updaten
   const card = document.getElementById('card-' + idx);
   if (card) {
     const nw = r.naehrstoffe || {};
     const nwHtml = (nw.kalorien||nw.protein) ? `<div style="display:flex;gap:8px;font-size:11px;color:var(--muted);margin-top:4px">${nw.kalorien?`<span>🔥 ${nw.kalorien} kcal</span>`:''}${nw.protein?`<span>💪 ${nw.protein}g P</span>`:''}</div>` : '';
+    const mealPrepHinweis = (mealPrepAktiv && istAbendessen) ? `<div style="font-size:11px;color:#0369A1;margin-top:3px;background:#EFF6FF;padding:4px 8px;border-radius:6px">🍱 Meal Prep: Mengen sind für <strong>2 Portionen</strong> (Abend + morgen Mittag)</div>` : '';
     const saveId = `savebtn-direkt-${idx}`;
     const rezeptData = JSON.stringify(planCards[idx]).replace(/'/g,"&#39;").replace(/"/g,'&quot;');
     card.innerHTML = `
@@ -1678,8 +1705,8 @@ function confirmPlanRezeptDirekt(rezeptId, btn) {
       </div>
       <div class="plan-titel">${r.titel}</div>
       <div class="plan-desc">${r.beschreibung||''}</div>
-      ${nwHtml}
-      <div class="plan-zutaten" style="margin-top:4px">${(r.zutaten||[]).map(z=>z.name).join(' · ')}</div>
+      ${nwHtml}${mealPrepHinweis}
+      <div class="plan-zutaten" style="margin-top:4px">${(r.zutaten||[]).map(z=>z.menge?`${z.name} (${z.menge})`:z.name).join(' · ')}</div>
       <div class="plan-actions">
         <button class="btn-small" id="${saveId}" onclick="savePlanRezept(${rezeptData},'${saveId}')">🔖</button>
         <button class="btn-small" id="gekocht-${idx}" onclick="openGekocht(${idx})">✓ Gekocht</button>

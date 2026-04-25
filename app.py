@@ -946,13 +946,22 @@ NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"na
                 {"role": "system", "content": """Du bist Einkaufsplaner für Deutschland (REWE). Antworte NUR mit validem JSON.
 REGELN:
 - einkaufsliste: NUR Zutaten die im Plan benötigt aber NICHT im Inventar sind (typ: fehlend)
-- extra_zutaten: optionale Zutaten die ein KONKRETES geplantes Rezept aufwerten würden
-- Jede extra_zutat MUSS "rezept" nennen welches Gericht sie aufwertet
-- extra_zutaten kommen NICHT automatisch auf die Einkaufsliste
+- KRITISCH: Menge = die kleinste handelsübliche Verpackungseinheit die man im Supermarkt kaufen kann:
+  * Eier → "6 Stück (1 Packung)" niemals "1 Stück" oder "2 Stück"
+  * Milch → "1 Liter (1 Packung)" niemals "200ml"
+  * Mehl → "1 kg (1 Packung)" niemals "100g"
+  * Nudeln/Reis/Linsen → "500g (1 Packung)" niemals "80g"
+  * Joghurt → "500g Becher" niemals "150g"
+  * Käse → "150g oder 200g Packung" niemals "30g"
+  * Tomaten (Dose) → "400g Dose" niemals "100g"
+  * Frisches Gemüse → reale Stückzahl/Bund die man kauft (z.B. "1 Bund Möhren", "1 Stück Brokkoli")
+  * Fleisch/Fisch → "1 Packung (ca. 400g)" niemals "150g"
+- Preis = Preis für die gesamte Verpackungseinheit, nicht für die Rezeptmenge
+- extra_zutaten: optionale Zutaten die ein KONKRETES Rezept aufwerten - "rezept" Feld pflicht
 - Grundzutaten wie Wasser, Salz, Pfeffer, Öl, Zucker NIEMALS vorschlagen
 - Korrekte deutsche Umlaute, realistische REWE-Preise
-- Für extra_zutaten: schätze den Makro-Zusatz pro Portion (naehrstoffe_zusatz als Text, z.B. "+8g Protein, +5g Fett")
-Format: {"extra_zutaten":[{"name":"Parmesan","menge":"1 Stück (ca. 100g)","preis_ca":2.49,"grund":"Macht die Pasta cremiger","rezept":"Pasta mit Tomaten","kategorie":"Kühlregal","naehrstoffe_zusatz":"+8g Protein, +120 kcal"}],"einkaufsliste":{"Obst & Gemüse":[{"name":"X","menge":"1 Stück","preis_ca":1.20,"typ":"fehlend"}],"Kühlregal":[],"Tiefkühl":[],"Brot & Backwaren":[],"Trockenwaren & Konserven":[],"Getränke":[],"Sonstiges":[]},"budget_verwendet":5.00,"budget_gesamt":20.00}"""},
+- Für extra_zutaten: naehrstoffe_zusatz als Text (z.B. "+8g Protein, +120 kcal")
+Format: {"extra_zutaten":[{"name":"Parmesan","menge":"1 Stück (ca. 100g)","preis_ca":2.49,"grund":"Macht die Pasta cremiger","rezept":"Pasta mit Tomaten","kategorie":"Kühlregal","naehrstoffe_zusatz":"+8g Protein, +120 kcal"}],"einkaufsliste":{"Obst & Gemüse":[{"name":"Eier","menge":"6 Stück (1 Packung)","preis_ca":1.99,"typ":"fehlend"}],"Kühlregal":[],"Tiefkühl":[],"Brot & Backwaren":[],"Trockenwaren & Konserven":[],"Getränke":[],"Sonstiges":[]},"budget_verwendet":5.00,"budget_gesamt":20.00}"""},
                 {"role": "user", "content": f"""Inventar (vorhanden, NICHT auf Liste): {all_items_text}
 
 Geplante Mahlzeiten mit Zutaten und Mengen:
