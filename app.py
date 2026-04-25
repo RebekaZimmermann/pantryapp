@@ -250,12 +250,67 @@ def meal_gekocht():
     portionen = float(data.get('portionen', 1))
     titel = data.get('titel', '')
 
+    import re
+
+    def parse_menge(menge_str):
+        """Extrahiert Zahl und Einheit aus Mengenstring. Gibt (zahl, einheit) zurück oder (None, None)."""
+        menge_str = menge_str.strip().lower()
+        m = re.match(r'^([\d.,]+)\s*(g|kg|ml|l|stück|stk|el|tl|packung|pck|dose|glas|becher|bund|liter)?', menge_str)
+        if m and m.group(1):
+            try:
+                zahl = float(m.group(1).replace(',', '.'))
+                einheit = m.group(2) or ''
+                return zahl, einheit
+            except:
+                pass
+        return None, None
+
+    def berechne_rest(inventar_menge, verbrauch_menge, portionen):
+        """Berechnet Restmenge nach Verbrauch."""
+        inv_zahl, inv_einheit = parse_menge(inventar_menge)
+        verb_zahl, verb_einheit = parse_menge(verbrauch_menge)
+
+        if inv_zahl is not None and verb_zahl is not None and inv_einheit == verb_einheit:
+            # Beide haben gleiche Einheit → direkte Subtraktion
+            rest = inv_zahl - (verb_zahl * portionen)
+            if rest <= 0:
+                return None  # Komplett verbraucht
+            # Schöne Ausgabe
+            if inv_einheit in ['g', 'ml']:
+                return f"{int(rest)}{inv_einheit}"
+            elif inv_einheit in ['kg', 'l', 'liter']:
+                return f"{rest:.2f} {inv_einheit}".rstrip('0').rstrip('.')
+            elif inv_einheit in ['stück', 'stk', '']:
+                return f"{int(rest)} Stück" if rest >= 1 else None
+            else:
+                return f"{int(rest)} {inv_einheit}"
+        return None  # Kann nicht berechnet werden
+
+    def beschreibung_zu_anteil(menge_str):
+        """Konvertiert Beschreibung wie 'halbe Packung' zu Anteil (0.5)."""
+        m = menge_str.lower()
+        if any(w in m for w in ['ganz', 'alles', 'alle', 'komplett', 'gesamt']): return 1.0
+        if any(w in m for w in ['dreiviertel', '3/4']): return 0.75
+        if any(w in m for w in ['hälfte', 'halb', '1/2']): return 0.5
+        if any(w in m for w in ['viertel', '1/4']): return 0.25
+        if any(w in m for w in ['drittel', '1/3']): return 0.33
+        return None
+
+    def inventar_anteil_zu_text(anteil):
+        """Konvertiert Anteil zu lesbarem Text."""
+        if anteil <= 0: return None
+        if anteil >= 0.9: return 'fast alles'
+        if anteil >= 0.6: return 'ca. dreiviertel Packung'
+        if anteil >= 0.4: return 'ca. halbe Packung'
+        if anteil >= 0.2: return 'ca. viertel Packung'
+        return 'wenig übrig'
+
     for zutat in zutaten:
         name = zutat.get('name', '').lower()
-        menge_str = zutat.get('menge', '').lower()
+        rezept_menge = zutat.get('menge', '').lower()
         kaufen = zutat.get('kaufen', False)
         if kaufen:
-            continue  # Eingekaufte Zutat – nicht im Inventar
+            continue
 
         item = InventarItem.query.filter(
             db.func.lower(InventarItem.name) == name
@@ -263,26 +318,50 @@ def meal_gekocht():
         if not item:
             continue
 
-        # Mengenreduktion basierend auf Portionen
-        if portionen >= 1.5:
-            # Viel verbraucht
-            if any(w in menge_str for w in ['ganz', 'alles', 'alle', 'komplett']):
-                db.session.delete(item)
-            else:
-                item.menge = 'wenig übrig'
-                item.urgency = 'soon'
-        else:
-            # 1 Portion
-            if any(w in menge_str for w in ['ganz', 'alles', 'alle', 'komplett']):
-                db.session.delete(item)
-            elif any(w in menge_str for w in ['hälfte', 'halb']):
-                item.menge = 'wenig übrig'
-                item.urgency = 'soon'
-            else:
-                item.menge = 'wenig übrig'
-                item.urgency = 'soon'
+        inv_menge = item.menge
 
-    # In Historie speichern
+        # Versuch 1: Direkte numerische Berechnung
+        rest = berechne_rest(inv_menge, rezept_menge, portionen)
+        if rest is not None:
+            item.menge = rest
+            item.urgency = 'soon'
+            db.session.flush()
+            continue
+        elif rest is None and berechne_rest(inv_menge, rezept_menge, portionen) is None:
+            # Prüfen ob berechnung 0 oder negativ war
+            inv_zahl, inv_e = parse_menge(inv_menge)
+            verb_zahl, verb_e = parse_menge(rezept_menge)
+            if inv_zahl and verb_zahl and inv_e == verb_e:
+                if inv_zahl - verb_zahl * portionen <= 0:
+                    db.session.delete(item)
+                    continue
+
+        # Versuch 2: Anteil-basierte Berechnung (z.B. "halbe Packung")
+        rezept_anteil = beschreibung_zu_anteil(rezept_menge)
+        inv_anteil = beschreibung_zu_anteil(inv_menge)
+
+        if rezept_anteil is not None:
+            verbrauch_gesamt = rezept_anteil * portionen
+            if inv_anteil is not None:
+                rest_anteil = inv_anteil - verbrauch_gesamt
+            else:
+                # Inventar hat keine Anteilsangabe → assume voll
+                rest_anteil = 1.0 - verbrauch_gesamt
+
+            if rest_anteil <= 0.05:
+                db.session.delete(item)
+            else:
+                item.menge = inventar_anteil_zu_text(rest_anteil)
+                item.urgency = 'soon'
+            continue
+
+        # Fallback: wenig übrig
+        if any(w in rezept_menge for w in ['ganz', 'alles', 'alle', 'komplett']):
+            db.session.delete(item)
+        else:
+            item.menge = 'wenig übrig'
+            item.urgency = 'soon'
+
     r = GekochteRezept(titel=titel, zutaten_json=json.dumps(zutaten))
     db.session.add(r)
     db.session.commit()
