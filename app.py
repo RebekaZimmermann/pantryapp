@@ -839,9 +839,10 @@ Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","kueche":"deutsch
         except Exception as e:
             plan.append({'tag': tag, 'mahlzeit': mahlzeit_label, 'titel': 'Fehler', 'beschreibung': str(e), 'zutaten': [], 'zubereitung': '', 'quelle': 'ki'})
 
-    # Snacks generieren (separater Loop, kein Inventar-Einfluss)
+    # Snacks generieren (separater Loop)
     if snacks_aktiv:
         already_snacks = []
+        inv_names_lower = {i.name.lower() for i in items}
         for tag in range(1, tage + 1):
             inv_rest = ', '.join([f"{x['menge']} {x['name']}" for x in virtual_inventory]) if virtual_inventory else 'nichts'
             snack_budget_info = ''
@@ -851,18 +852,23 @@ Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","kueche":"deutsch
                 snack_budget_info = f'Budget: ca. {budget/(tage*(mahlzeiten_pro_tag+1)):.2f} €'
             try:
                 response = client.chat.completions.create(
-                    model='gpt-4o', max_tokens=400,
+                    model='gpt-4o', max_tokens=500,
                     messages=[
                         {"role": "system", "content": f"""Gesunder, einfacher Snack für 1 Person in Deutschland. ERNÄHRUNG: {ernaehrung_text}. {mag_nicht_text}
 Nur bekannte, realistische Snacks ohne seltsame Kombinationen.
-Gute Beispiele: Apfel, Banane, Handvoll Nüsse, Naturjoghurt mit Beeren, Möhren mit Hummus, Reiswaffeln mit Frischkäse, Quark mit Obst.
-Schlechte Beispiele (NIEMALS): Joghurt-Parmesan-Dip, Käse-Obst-Kombis, ungewöhnliche Mischungen.
-NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"name":"Apfel","menge":"1 Stück","kaufen":true}}],"zubereitung":"Kurz"}}"""},
-                        {"role": "user", "content": f"Inventar: {inv_rest}\n{snack_budget_info}\nBisherige Snacks (nicht wiederholen): {', '.join(already_snacks)}\nSnack für Tag {tag}. Einfach und alltagstauglich."}
+Gute Beispiele: 1 Apfel, 1 Banane, 30g Nüsse, 150g Naturjoghurt mit Beeren, 2 Möhren mit 2 EL Hummus, 2 Reiswaffeln mit Frischkäse.
+WICHTIG: Genaue Mengenangaben für jede Zutat (z.B. "1 Stück", "150g", "2 EL", "30g").
+"kaufen": false wenn Zutat im Inventar, true wenn neu kaufen.
+NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"name":"Apfel","menge":"1 Stück (ca. 150g)","kaufen":false}},{{"name":"Erdnussbutter","menge":"1 EL (ca. 15g)","kaufen":true}}],"zubereitung":"Kurz"}}"""},
+                        {"role": "user", "content": f"Inventar (kaufen:false für diese): {inv_rest}\n{snack_budget_info}\nBisherige Snacks (nicht wiederholen): {', '.join(already_snacks)}\nSnack für Tag {tag}."}
                     ]
                 )
                 text = response.choices[0].message.content.replace('```json','').replace('```','').strip()
                 snack = json.loads(text)
+                # kaufen-Flag nachkorrigieren basierend auf Inventar
+                for z in snack.get('zutaten', []):
+                    if z['name'].lower() in inv_names_lower:
+                        z['kaufen'] = False
                 snack['tag'] = tag
                 snack['mahlzeit'] = 'Snack'
                 snack['quelle'] = 'ki'
