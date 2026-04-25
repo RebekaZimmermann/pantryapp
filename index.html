@@ -255,35 +255,35 @@
     <div id="tab-mealplan" class="section">
       <div style="background:var(--green-pale);border-radius:12px;padding:14px;margin-bottom:14px">
         <div style="font-size:11px;font-weight:500;color:var(--green);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Plan erstellen</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px">
           <div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Tage</div>
-            <input type="number" id="plan-tage" value="5" min="1" max="14" style="text-align:center;height:38px" oninput="checkBudgetHinweis()" />
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Tage</div>
+            <input type="number" id="plan-tage" value="5" min="1" max="14" style="text-align:center;height:36px;font-size:15px" oninput="checkBudgetHinweis()" />
           </div>
           <div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Mahlzeiten</div>
-            <input type="number" id="plan-mahlzeiten" value="2" min="1" max="3" style="text-align:center;height:38px" />
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Mahlzeiten</div>
+            <input type="number" id="plan-mahlzeiten" value="2" min="1" max="3" style="text-align:center;height:36px;font-size:15px" />
           </div>
           <div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Budget (€)</div>
-            <input type="number" id="plan-budget" value="0" min="0" step="5" style="text-align:center;height:38px" oninput="checkBudgetHinweis()" />
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Budget €</div>
+            <input type="number" id="plan-budget" value="0" min="0" step="5" style="text-align:center;height:36px;font-size:15px" oninput="checkBudgetHinweis()" />
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
           <div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Startdatum</div>
-            <input type="date" id="plan-startdatum" style="font-family:DM Sans,sans-serif;font-size:13px;padding:8px;border:1px solid var(--border);border-radius:8px;width:100%;height:38px;box-sizing:border-box;background:var(--white)" />
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Startdatum</div>
+            <input type="date" id="plan-startdatum" style="font-family:DM Sans,sans-serif;font-size:12px;padding:0 6px;border:1px solid var(--border);border-radius:8px;width:100%;height:36px;box-sizing:border-box;background:var(--white);-webkit-appearance:none" />
           </div>
           <div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Ab Mahlzeit</div>
-            <select id="start-mahlzeit" style="font-family:DM Sans,sans-serif;font-size:13px;padding:8px;border:1px solid var(--border);border-radius:8px;width:100%;height:38px;background:var(--white)">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Ab Mahlzeit</div>
+            <select id="start-mahlzeit" style="font-family:DM Sans,sans-serif;font-size:12px;padding:0 6px;border:1px solid var(--border);border-radius:8px;width:100%;height:36px;background:var(--white);-webkit-appearance:none;appearance:none">
               <option value="Fruehstueck">Frühstück</option>
               <option value="Mittagessen" selected>Mittagessen</option>
               <option value="Abendessen">Abendessen</option>
             </select>
           </div>
         </div>
-        <div id="budget-hinweis" style="display:none;border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:8px"></div>
+        <div id="budget-hinweis" style="display:none;border-radius:8px;padding:7px 10px;font-size:12px;margin-bottom:6px"></div>
         <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;margin-bottom:10px;padding:10px 12px;background:var(--white);border-radius:8px;border:1px solid var(--border)">
           <input type="checkbox" id="meal-prep-toggle" style="accent-color:var(--green);width:16px;height:16px">
           <div>
@@ -1048,21 +1048,26 @@ function checkBudgetHinweis() {
   const tage = parseInt(document.getElementById('plan-tage')?.value) || 5;
   const hinweis = document.getElementById('budget-hinweis');
   if (!hinweis) return;
-  if (budget <= 0) { hinweis.style.display = 'none'; return; }
+  if (budget <= 0) {
+    hinweis.style.display = 'none';
+    hinweis.textContent = '';
+    return;
+  }
   const proTag = budget / tage;
   hinweis.style.display = 'block';
   if (proTag < 3) {
     hinweis.style.background = 'var(--orange-pale)';
     hinweis.style.border = '1px solid var(--orange)';
     hinweis.style.color = 'var(--orange)';
-    hinweis.textContent = `⚠️ ${proTag.toFixed(2)}€/Tag ist sehr knapp. Qualität und Vielfalt werden eingeschränkt sein.`;
+    hinweis.textContent = `⚠️ ${proTag.toFixed(2)}€/Tag ist sehr knapp.`;
   } else if (proTag < 5) {
     hinweis.style.background = '#FEF3C7';
     hinweis.style.border = '1px solid #F59E0B';
     hinweis.style.color = '#92400E';
-    hinweis.textContent = `💡 ${proTag.toFixed(2)}€/Tag – die App wählt günstige Zutaten.`;
+    hinweis.textContent = `💡 ${proTag.toFixed(2)}€/Tag – günstige Zutaten werden bevorzugt.`;
   } else {
     hinweis.style.display = 'none';
+    hinweis.textContent = '';
   }
 }
 
@@ -1148,7 +1153,12 @@ function renderMealPlan(data) {
       const cardIdx = planCardIndex++;
       const nw = m.naehrstoffe || {};
       const nwHtml = (nw.kalorien || nw.protein) ? `<div style="display:flex;gap:8px;font-size:11px;color:var(--muted);margin-top:4px;flex-wrap:wrap">${nw.kalorien?`<span>🔥 ${nw.kalorien} kcal</span>`:''}${nw.protein?`<span>💪 ${nw.protein}g P</span>`:''}${nw.kohlenhydrate?`<span>🌾 ${nw.kohlenhydrate}g KH</span>`:''}${nw.fett?`<span>🥑 ${nw.fett}g F</span>`:''}</div>` : '';
-      const mealPrepNote = isMealPrep ? `<div style="font-size:11px;color:#0369A1;margin-top:3px">🍱 Vom gestrigen Abendessen – kein Kochen nötig</div>` : '';
+      const mealPrepNote = isMealPrep
+        ? `<div style="font-size:11px;color:#0369A1;margin-top:3px;background:#EFF6FF;padding:4px 8px;border-radius:6px">🍱 Vom gestrigen Abendessen – kein Kochen nötig. Mengen = 1 Portion.</div>`
+        : '';
+      const mealPrepDoppelt = (!isMealPrep && m.mahlzeit === 'Abendessen' && document.getElementById('meal-prep-toggle')?.checked)
+        ? `<div style="font-size:11px;color:#0369A1;margin-top:3px;background:#EFF6FF;padding:4px 8px;border-radius:6px">🍱 Meal Prep: Mengen sind für <strong>2 Portionen</strong> (Abend + morgen Mittag)</div>`
+        : '';
       html += `<div class="plan-card${isGespeichert?' gespeichert':''}${isMealPrep?' meal-prep-card':''}"
         id="card-${cardIdx}" data-idx="${cardIdx}" data-tag="${t}" data-mahlzeit="${m.mahlzeit}"
         draggable="true" ondragstart="onDragStart(event,${cardIdx})" ondragend="onDragEnd(event)"
@@ -1166,7 +1176,7 @@ function renderMealPlan(data) {
         </div>
         <div class="plan-titel">${m.titel}</div>
         <div class="plan-desc">${m.beschreibung||''}</div>
-        ${nwHtml}${mealPrepNote}
+        ${nwHtml}${mealPrepNote}${mealPrepDoppelt}
         <div class="plan-zutaten" style="margin-top:4px">${(m.zutaten||[]).map(z=>{const mg=(z.menge||'').replace(/^(wenig übrig|ca\. Hälfte noch|wenig uebrig|Haelfte noch)\s*/i,'').trim();return mg?`${z.name} (${mg})`:z.name;}).join(' · ')}</div>
         <div class="plan-zubereitung" id="zub-${rezeptId}">${m.zubereitung||''}</div>
         <div class="plan-actions">

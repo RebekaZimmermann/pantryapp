@@ -873,10 +873,12 @@ NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"na
                 plan.append({'tag': tag, 'mahlzeit': 'Snack', 'titel': 'Snack', 'beschreibung': str(e), 'zutaten': [], 'zubereitung': '', 'quelle': 'ki', 'phase': 2})
 
     # Einkaufsliste & Extra-Zutaten
-    # Fix: Inventar-Zutaten die im Plan mehr gebraucht werden als vorhanden
-    # Sammle benötigte Gesamtmenge pro Zutat aus dem Plan
-    inventar_bedarf = {}  # name.lower -> Liste aller Mengen-Strings aus dem Plan
-    for m in plan:
+    # Meal Prep Kopien ausschließen – sie kochen dieselbe Portion wie das Abendessen
+    plan_ohne_meal_prep = [m for m in plan if m.get('quelle') != 'meal_prep']
+
+    # Inventar-Zutaten die im Plan mehr gebraucht werden als vorhanden
+    inventar_bedarf = {}
+    for m in plan_ohne_meal_prep:
         for z in m.get('zutaten', []):
             if not z.get('kaufen', False):
                 zn = z['name'].lower()
@@ -884,7 +886,6 @@ NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"na
                     inventar_bedarf[zn] = []
                 inventar_bedarf[zn].append(z.get('menge', ''))
 
-    # Prüfe ob Zutat mehrfach gebraucht wird (gleiche Zutat in >1 Rezept)
     mehrfach_benoetigt = []
     for zn, mengen in inventar_bedarf.items():
         if len(mengen) > 1:
@@ -897,8 +898,16 @@ NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"na
                 )
 
     all_items_text = ', '.join([f"{i.menge} {i.name}" for i in items])
-    plan_zutaten_text = '\n'.join([f"- {m['titel']} (Tag {m['tag']}, {m['mahlzeit']}): {', '.join([z['name'] + ' (' + z.get('menge','') + ')' for z in m.get('zutaten',[])])}" for m in plan])
-    fehlende_namen = ', '.join(set([z['name'] for m in plan for z in m.get('zutaten', []) if z['name'].lower() not in [i.name.lower() for i in items]]))
+    # Nur plan_ohne_meal_prep für Einkaufsliste verwenden
+    plan_zutaten_text = '\n'.join([
+        f"- {m['titel']} (Tag {m['tag']}, {m['mahlzeit']}): {', '.join([z['name'] + ' (' + z.get('menge','') + ')' for z in m.get('zutaten',[])])}"
+        for m in plan_ohne_meal_prep
+    ])
+    fehlende_namen = ', '.join(set([
+        z['name'] for m in plan_ohne_meal_prep
+        for z in m.get('zutaten', [])
+        if z['name'].lower() not in [i.name.lower() for i in items]
+    ]))
     mehrfach_text = ('Mehrfach benötigte Inventar-Zutaten (extra Menge kaufen): ' + '; '.join(mehrfach_benoetigt)) if mehrfach_benoetigt else ''
     budget_text = f"Budget für Einkauf: {budget:.2f} EUR" if budget > 0 else "Kein Budget festgelegt"
 
