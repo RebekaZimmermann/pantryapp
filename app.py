@@ -401,6 +401,34 @@ Haltbarkeit: soon=Obst/Gemuese/Fleisch/Fisch, week=Milch/Joghurt/Kaese/Brot, lat
         return jsonify({'error': str(e)}), 500
 
 # --- Meal Plan ---
+@app.route('/preis-schaetzen', methods=['POST', 'OPTIONS'])
+def preis_schaetzen():
+    if request.method == 'OPTIONS':
+        return jsonify({'ok': True}), 200
+    openai_key = os.environ.get('OPENAI_API_KEY')
+    if not openai_key:
+        return jsonify({'preis': 0}), 200
+    data = request.json
+    name = data.get('name', '')
+    if not name:
+        return jsonify({'preis': 0}), 200
+    client = OpenAI(api_key=openai_key)
+    try:
+        response = client.chat.completions.create(
+            model='gpt-4o', max_tokens=50,
+            messages=[{
+                'role': 'user',
+                'content': f'Was kostet "{name}" ungefähr im deutschen REWE Supermarkt? Antworte NUR mit der Zahl in Euro (z.B. 1.99). Kein Text, keine Einheit.'
+            }]
+        )
+        text = response.choices[0].message.content.strip().replace(',', '.')
+        import re
+        m = re.search(r'[\d.]+', text)
+        preis = float(m.group()) if m else 0
+        return jsonify({'preis': round(preis, 2)})
+    except:
+        return jsonify({'preis': 0})
+
 @app.route('/mealplan', methods=['POST', 'OPTIONS'])
 def mealplan():
     if request.method == 'OPTIONS':

@@ -255,19 +255,33 @@
     <div id="tab-mealplan" class="section">
       <div style="background:var(--green-pale);border-radius:12px;padding:14px;margin-bottom:14px">
         <div style="font-size:11px;font-weight:500;color:var(--green);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Plan erstellen</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Tage</div><input type="number" id="plan-tage" value="5" min="1" max="14" style="text-align:center" oninput="checkBudgetHinweis()" /></div>
-          <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Mahlzeiten/Tag</div><input type="number" id="plan-mahlzeiten" value="2" min="1" max="3" style="text-align:center" /></div>
-          <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Budget (€)</div><input type="number" id="plan-budget" value="0" min="0" step="5" style="text-align:center" oninput="checkBudgetHinweis()" /></div>
-          <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Startdatum</div><input type="date" id="plan-startdatum" style="font-family:DM Sans,sans-serif;font-size:11px;padding:8px 4px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--white)" /></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Tage</div>
+            <input type="number" id="plan-tage" value="5" min="1" max="14" style="text-align:center;height:38px" oninput="checkBudgetHinweis()" />
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Mahlzeiten</div>
+            <input type="number" id="plan-mahlzeiten" value="2" min="1" max="3" style="text-align:center;height:38px" />
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Budget (€)</div>
+            <input type="number" id="plan-budget" value="0" min="0" step="5" style="text-align:center;height:38px" oninput="checkBudgetHinweis()" />
+          </div>
         </div>
-        <div style="margin-bottom:8px">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Ab Mahlzeit (heute)</div>
-          <select id="start-mahlzeit" style="font-family:DM Sans,sans-serif;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--white)">
-            <option value="Fruehstueck">Frühstück</option>
-            <option value="Mittagessen" selected>Mittagessen</option>
-            <option value="Abendessen">Abendessen</option>
-          </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Startdatum</div>
+            <input type="date" id="plan-startdatum" style="font-family:DM Sans,sans-serif;font-size:13px;padding:8px;border:1px solid var(--border);border-radius:8px;width:100%;height:38px;box-sizing:border-box;background:var(--white)" />
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Ab Mahlzeit</div>
+            <select id="start-mahlzeit" style="font-family:DM Sans,sans-serif;font-size:13px;padding:8px;border:1px solid var(--border);border-radius:8px;width:100%;height:38px;background:var(--white)">
+              <option value="Fruehstueck">Frühstück</option>
+              <option value="Mittagessen" selected>Mittagessen</option>
+              <option value="Abendessen">Abendessen</option>
+            </select>
+          </div>
         </div>
         <div id="budget-hinweis" style="display:none;border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:8px"></div>
         <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;margin-bottom:10px;padding:10px 12px;background:var(--white);border-radius:8px;border:1px solid var(--border)">
@@ -1124,7 +1138,8 @@ function renderMealPlan(data) {
     </div>`;
     html += `<div class="day-drop-zone" id="dropzone-${t}" data-tag="${t}" ondragover="onDragOverZone(event,${t})" ondragleave="onDragLeaveZone(${t})" ondrop="onDropZone(event,${t})">`;
     for (const m of mahlzeiten) {
-      const urgentCount = (m.zutaten || []).filter(z => z.urgency === 'soon').length;
+      const soonInvNames = new Set(inventory.filter(i=>i.urgency==='soon').map(i=>i.name.toLowerCase()));
+      const urgentCount = (m.zutaten || []).filter(z => z.urgency === 'soon' || soonInvNames.has(z.name.toLowerCase())).length;
       const rezeptId = `plan-${t}-${m.mahlzeit.replace(/\s/g,'')}`;
       const saveId = `savebtn-${rezeptId}`;
       const isGespeichert = m.quelle === 'gespeichert';
@@ -1487,26 +1502,41 @@ async function confirmPlanGekocht() {
   } catch(e) { alert('Fehler: ' + e.message); }
 }
 
-function addManualEinkauf() {
+async function addManualEinkauf() {
   const nameEl = document.getElementById('einkauf-manual-name');
   const name = nameEl?.value.trim();
   if (!name) return;
+  const btn = nameEl.nextElementSibling;
+  const origText = btn.textContent;
+  btn.textContent = '⏳'; btn.disabled = true;
+
+  let preis = 0;
+  try {
+    const res = await fetch('/preis-schaetzen', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const d = await res.json();
+    preis = d.preis || 0;
+  } catch(e) {}
+
   const wrapper = document.getElementById('einkaufsliste-wrapper');
-  if (!wrapper) return;
-  // In Sonstiges einfügen oder neue Kategorie anlegen
-  let sonstiges = wrapper.querySelector('[data-kategorie="Sonstiges"]');
-  if (!sonstiges) {
-    sonstiges = document.createElement('div');
-    sonstiges.className = 'einkauf-kategorie';
-    sonstiges.dataset.kategorie = 'Sonstiges';
-    sonstiges.innerHTML = '<h4>Sonstiges</h4>';
-    wrapper.appendChild(sonstiges);
+  if (wrapper) {
+    let sonstiges = wrapper.querySelector('[data-kategorie="Sonstiges"]');
+    if (!sonstiges) {
+      sonstiges = document.createElement('div');
+      sonstiges.className = 'einkauf-kategorie';
+      sonstiges.dataset.kategorie = 'Sonstiges';
+      sonstiges.innerHTML = '<h4>Sonstiges</h4>';
+      wrapper.appendChild(sonstiges);
+    }
+    const idx = einkaufItemCount++;
+    einkaufPreise[idx] = preis;
+    sonstiges.insertAdjacentHTML('beforeend', renderEinkaufItem(idx, name, '', preis, 'extra'));
+    updateBudget();
   }
-  const idx = einkaufItemCount++;
-  einkaufPreise[idx] = 0; // Kein Preis bekannt
-  sonstiges.insertAdjacentHTML('beforeend', renderEinkaufItem(idx, name, '', 0, 'extra'));
   nameEl.value = '';
-  updateBudget();
+  btn.textContent = origText; btn.disabled = false;
 }
 
 // Rezept bearbeiten
