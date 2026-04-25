@@ -535,9 +535,17 @@ def mealplan():
         elif mahlzeiten_pro_tag == 2:
             mahlzeit_label = ['Mittagessen', 'Abendessen'][mahlzeit_nr - 1]
         elif mahlzeiten_pro_tag == 3:
-            mahlzeit_label = ['Fruehstueck', 'Mittagessen', 'Abendessen'][mahlzeit_nr - 1]
+            mahlzeit_label = ['Frühstück', 'Mittagessen', 'Abendessen'][mahlzeit_nr - 1]
         else:
             mahlzeit_label = f'Mahlzeit {mahlzeit_nr}'
+
+        # start_mahlzeit: Mahlzeiten vor der gewählten Startmahlzeit an Tag 1 überspringen
+        if tag == 1 and start_mahlzeit:
+            mahlzeit_reihenfolge = ['Frühstück', 'Fruehstueck', 'Mittagessen', 'Abendessen']
+            start_idx = next((i for i, m in enumerate(mahlzeit_reihenfolge) if m == start_mahlzeit), 0)
+            label_idx = next((i for i, m in enumerate(mahlzeit_reihenfolge) if m == mahlzeit_label), 0)
+            if label_idx < start_idx:
+                continue  # Diese Mahlzeit überspringen
 
         # Meal Prep: Mittagessen von Tag 2+ = Abendessen des Vortags
         if meal_prep and mahlzeit_label == 'Mittagessen' and tag > 1:
@@ -560,87 +568,65 @@ def mealplan():
         later = [x for x in virtual_inventory if x['urgency'] == 'later']
 
         # Phase bestimmen
-        phase1 = len(soon_names) > 0  # noch dringende Zutaten vorhanden
+        phase1 = len(soon_names) > 0
         phase2 = not phase1
 
-        already_planned = ', '.join([m['titel'] for m in plan]) if plan else 'keine'
+        already_planned = ', '.join(set([m['titel'] for m in plan])) if plan else 'keine'
         todays_meals = [m for m in plan if m.get('tag') == tag]
         todays_titles = ', '.join([m['titel'] for m in todays_meals]) if todays_meals else 'keine'
 
-        # Gespeichertes Rezept einplanen: nur wenn Kategorie zu Mahlzeit-Slot passt
+        # Gespeichertes Rezept einplanen: passendes für diesen Slot suchen
+        gespeichert_einplanen = None
         if gespeicherte_idx < len(gespeicherte):
-            gr = gespeicherte[gespeicherte_idx]
-            kat = json.loads(gr.kategorien or '[]')
-            # Kategorie-Slot Mapping
-            slot_map = {
-                'Frühstück': 'fruehstueck', 'Fruehstueck': 'fruehstueck',
-                'Mittagessen': 'mittagessen', 'Abendessen': 'abendessen', 'Snack': 'snack'
-            }
+            slot_map = {'Frühstück': 'fruehstueck', 'Fruehstueck': 'fruehstueck',
+                        'Mittagessen': 'mittagessen', 'Abendessen': 'abendessen', 'Snack': 'snack'}
             slot_key = slot_map.get(mahlzeit_label, '')
-            # Wenn Rezept hat Kategorien und passt nicht → überspringen
-            if kat and slot_key and slot_key not in kat:
-                # Suche passendes gespeichertes Rezept für diesen Slot
-                passendes = None
-                for gi in range(gespeicherte_idx, len(gespeicherte)):
-                    gr_check = gespeicherte[gi]
-                    kat_check = json.loads(gr_check.kategorien or '[]')
-                    if not kat_check or slot_key in kat_check:
-                        passendes = gr_check
-                        gespeicherte.pop(gi)
-                        break
-                gr = passendes  # None wenn keins gefunden
 
-            if gr:
-                gespeicherte_idx += 1 if gr == gespeicherte[gespeicherte_idx - 1] else 0
-                zutaten = json.loads(gr.zutaten_json)
+            # Suche das erste noch nicht verwendete Rezept das zum Slot passt
+            for gi in range(gespeicherte_idx, len(gespeicherte)):
+                gr_check = gespeicherte[gi]
+                kat_check = json.loads(gr_check.kategorien or '[]')
+                # Passt wenn: keine Kategorie gesetzt ODER slot_key in Kategorien
+                if not kat_check or not slot_key or slot_key in kat_check:
+                    gespeichert_einplanen = gr_check
+                    gespeicherte.pop(gi)  # aus Liste entfernen damit es nicht nochmal verwendet wird
+                    break
 
-                # Prüfen ob Rezept zur Ernährungseinschränkung passt
-                fleisch_zutaten = ['hähnchen', 'hühnchen', 'huhn', 'rind', 'hackfleisch', 'schwein', 'lamm', 'kalb', 'turkey', 'truthahn']
-                rohes_fleisch = any(any(f in z['name'].lower() for f in fleisch_zutaten) for z in zutaten)
+        if gespeichert_einplanen:
+            gr = gespeichert_einplanen
+            zutaten = json.loads(gr.zutaten_json)
+
+            # Ernährungseinschränkung prüfen
+            fleisch_zutaten = ['hähnchen', 'hühnchen', 'huhn', 'rind', 'hackfleisch', 'schwein', 'lamm', 'kalb', 'turkey', 'truthahn']
+            rohes_fleisch = any(any(f in z['name'].lower() for f in fleisch_zutaten) for z in zutaten)
+            braucht_ersatz = (ernaehrung in ['vegetarisch', 'vegan'] and rohes_fleisch) or \
+                             (ernaehrung == 'kein_rohes_fleisch' and rohes_fleisch)
+
+            if braucht_ersatz:
+                ersatz_map = {'vegetarisch': 'Tofu oder Tempeh', 'vegan': 'Tofu oder Tempeh', 'kein_rohes_fleisch': 'TK-Hähnchen (vorgegart) oder Tofu'}
+                ersatz = ersatz_map.get(ernaehrung, 'pflanzliche Alternative')
+                zutaten = [dict(z, name=ersatz) if any(f in z['name'].lower() for f in fleisch_zutaten) else z for z in zutaten]
+                titel = gr.titel + f' (mit {ersatz})'
+            else:
+                titel = gr.titel
                 braucht_ersatz = False
-                if ernaehrung in ['vegetarisch', 'vegan'] and rohes_fleisch:
-                    braucht_ersatz = True
-                elif ernaehrung == 'kein_rohes_fleisch' and rohes_fleisch:
-                    braucht_ersatz = True
 
-                if braucht_ersatz:
-                    # KI bittet um Ersatz-Version
-                    try:
-                        fleisch_name = next((z['name'] for z in zutaten if any(f in z['name'].lower() for f in fleisch_zutaten)), 'Fleisch')
-                        ersatz_map = {'vegetarisch': 'Tofu oder Tempeh', 'vegan': 'Tofu oder Tempeh', 'kein_rohes_fleisch': 'TK-Hähnchen (vorgegart) oder Tofu'}
-                        ersatz = ersatz_map.get(ernaehrung, 'pflanzliche Alternative')
-                        zutaten_neu = [dict(z, name=ersatz) if any(f in z['name'].lower() for f in fleisch_zutaten) else z for z in zutaten]
-                        titel_neu = gr.titel + f' (mit {ersatz})'
-                    except:
-                        zutaten_neu = zutaten
-                        titel_neu = gr.titel
-                    zutaten = zutaten_neu
-                    rezept_titel = titel_neu
-                else:
-                    rezept_titel = gr.titel
-
-                rezept = {
-                    'titel': rezept_titel,
-                    'beschreibung': gr.beschreibung or '',
-                    'zutaten': zutaten,
-                    'zubereitung': gr.zubereitung or '',
-                    'zeit': '–',
-                    'tag': tag,
-                    'mahlzeit': mahlzeit_label,
-                    'quelle': 'gespeichert',
-                    'naehrstoffe': {},
-                    'ersatz': braucht_ersatz
-                }
-                plan.append(rezept)
-                for zutat in zutaten:
-                    zn = zutat['name'].lower()
-                    for inv_item in list(virtual_inventory):
-                        if inv_item['name'].lower() == zn:
-                            virtual_inventory.remove(inv_item)
-                            if inv_item['name'] in soon_names:
-                                soon_names.remove(inv_item['name'])
-                            break
-                continue
+            rezept = {
+                'titel': titel, 'beschreibung': gr.beschreibung or '',
+                'zutaten': zutaten, 'zubereitung': gr.zubereitung or '',
+                'zeit': '–', 'tag': tag, 'mahlzeit': mahlzeit_label,
+                'quelle': 'gespeichert', 'naehrstoffe': {}, 'ersatz': braucht_ersatz
+            }
+            plan.append(rezept)
+            for zutat in zutaten:
+                zn = zutat['name'].lower()
+                for inv_item in list(virtual_inventory):
+                    if inv_item['name'].lower() == zn:
+                        virtual_inventory.remove(inv_item)
+                        if inv_item['name'] in soon_names:
+                            soon_names.remove(inv_item['name'])
+                        break
+            continue
 
         try:
             if phase2:
