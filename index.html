@@ -255,26 +255,21 @@
     <div id="tab-mealplan" class="section">
       <div style="background:var(--green-pale);border-radius:12px;padding:14px;margin-bottom:14px">
         <div style="font-size:11px;font-weight:500;color:var(--green);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Plan erstellen</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
           <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Tage</div><input type="number" id="plan-tage" value="5" min="1" max="14" style="text-align:center" oninput="checkBudgetHinweis()" /></div>
           <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Mahlzeiten/Tag</div><input type="number" id="plan-mahlzeiten" value="2" min="1" max="3" style="text-align:center" /></div>
           <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Budget (€)</div><input type="number" id="plan-budget" value="0" min="0" step="5" style="text-align:center" oninput="checkBudgetHinweis()" /></div>
+          <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Startdatum</div><input type="date" id="plan-startdatum" style="font-family:DM Sans,sans-serif;font-size:12px;padding:8px 6px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--white)" /></div>
         </div>
-        <div id="budget-hinweis" style="display:none;background:var(--orange-pale);border:1px solid var(--orange);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--orange);margin-bottom:8px"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-          <div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Startdatum</div>
-            <input type="date" id="plan-startdatum" style="font-family:DM Sans,sans-serif;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--white)" />
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Ab Mahlzeit</div>
-            <select id="start-mahlzeit" style="font-family:DM Sans,sans-serif;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--white)">
-              <option value="Fruehstueck">Frühstück</option>
-              <option value="Mittagessen" selected>Mittagessen</option>
-              <option value="Abendessen">Abendessen</option>
-            </select>
-          </div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Ab Mahlzeit (heute)</div>
+          <select id="start-mahlzeit" style="font-family:DM Sans,sans-serif;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--white)">
+            <option value="Fruehstueck">Frühstück</option>
+            <option value="Mittagessen" selected>Mittagessen</option>
+            <option value="Abendessen">Abendessen</option>
+          </select>
         </div>
+        <div id="budget-hinweis" style="display:none;border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:8px"></div>
         <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;margin-bottom:10px;padding:10px 12px;background:var(--white);border-radius:8px;border:1px solid var(--border)">
           <input type="checkbox" id="meal-prep-toggle" style="accent-color:var(--green);width:16px;height:16px">
           <div>
@@ -1041,15 +1036,17 @@ function checkBudgetHinweis() {
   if (!hinweis) return;
   if (budget <= 0) { hinweis.style.display = 'none'; return; }
   const proTag = budget / tage;
+  hinweis.style.display = 'block';
   if (proTag < 3) {
-    hinweis.style.display = 'block';
-    hinweis.textContent = `⚠️ ${proTag.toFixed(2)}€/Tag ist sehr knapp. Die App wird es versuchen, aber Qualität und Vielfalt werden eingeschränkt sein.`;
+    hinweis.style.background = 'var(--orange-pale)';
+    hinweis.style.border = '1px solid var(--orange)';
+    hinweis.style.color = 'var(--orange)';
+    hinweis.textContent = `⚠️ ${proTag.toFixed(2)}€/Tag ist sehr knapp. Qualität und Vielfalt werden eingeschränkt sein.`;
   } else if (proTag < 5) {
-    hinweis.style.display = 'block';
-    hinweis.textContent = `💡 ${proTag.toFixed(2)}€/Tag ist moderat – die App wählt günstige Zutaten.`;
     hinweis.style.background = '#FEF3C7';
-    hinweis.style.borderColor = '#F59E0B';
+    hinweis.style.border = '1px solid #F59E0B';
     hinweis.style.color = '#92400E';
+    hinweis.textContent = `💡 ${proTag.toFixed(2)}€/Tag – die App wählt günstige Zutaten.`;
   } else {
     hinweis.style.display = 'none';
   }
@@ -1121,7 +1118,6 @@ function renderMealPlan(data) {
   html += '<div class="section-label">Dein Wochenplan</div>';
   for (let t = 1; t <= tage; t++) {
     const mahlzeiten = plan[t] || [];
-    const dayLabel = days[(today + t - 2) % 7];
     html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
       <div class="day-header" style="margin:0">Tag ${t} · ${getTagLabel(t)}</div>
       <button class="btn-small" onclick="alleGekocht(${t})" style="font-size:11px;border-color:var(--green);color:var(--green)">✓ Alle gekocht</button>
@@ -1579,14 +1575,78 @@ async function saveEditRezept() {
 function planRezeptDirekt(id) {
   const r = meineRezepte.find(r => r.id === id);
   if (!r) return;
-  const tabBtn = document.querySelector('.tab[onclick*="mealplan"]');
-  if (tabBtn) showTab('mealplan', tabBtn);
-  setTimeout(() => {
-    const details = document.querySelector('#rezept-auswahl-container details');
-    if (details) details.open = true;
-    const cb = document.getElementById('cb-rezept-' + id);
-    if (cb) { cb.checked = true; cb.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-  }, 200);
+  // Prüfen ob ein Plan aktiv ist
+  const hasPlan = Object.keys(planCards).length > 0;
+  if (!hasPlan) {
+    alert('Bitte zuerst einen Meal Plan generieren, dann kannst du Rezepte direkt einplanen.');
+    const tabBtn = document.querySelector('.tab[onclick*="mealplan"]');
+    if (tabBtn) showTab('mealplan', tabBtn);
+    return;
+  }
+  // Verfügbare Slots im Plan anzeigen
+  const slots = Object.entries(planCards)
+    .map(([idx, m]) => ({ idx: parseInt(idx), tag: m.tag, mahlzeit: m.mahlzeit, titel: m.titel }))
+    .sort((a, b) => a.tag - b.tag || a.mahlzeit.localeCompare(b.mahlzeit));
+
+  const slotOptions = slots.map(s =>
+    `<option value="${s.idx}">Tag ${s.tag} · ${s.mahlzeit} (${s.titel})</option>`
+  ).join('');
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(26,26,20,0.6);display:flex;align-items:flex-end;z-index:400;padding:16px';
+  modal.innerHTML = `
+    <div style="background:var(--white);border-radius:16px;padding:20px;width:100%">
+      <div style="font-family:Fraunces,serif;font-size:18px;margin-bottom:8px">${r.titel}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Welchen Slot ersetzen?</div>
+      <select id="slot-select" style="font-family:DM Sans,sans-serif;font-size:13px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--white);margin-bottom:14px">
+        ${slotOptions}
+      </select>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" style="flex:1" onclick="this.closest('div[style*=fixed]').remove()">Abbrechen</button>
+        <button class="btn btn-primary" style="flex:1" onclick="confirmPlanRezeptDirekt(${id},this)">Einplanen</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function confirmPlanRezeptDirekt(rezeptId, btn) {
+  const r = meineRezepte.find(r => r.id === rezeptId);
+  if (!r) return;
+  const select = document.getElementById('slot-select');
+  const idx = parseInt(select.value);
+  const m = planCards[idx];
+  if (!m) return;
+
+  // Rezept in den Slot einsetzen
+  planCards[idx] = { ...m, titel: r.titel, beschreibung: r.beschreibung || '', zutaten: r.zutaten || [], zubereitung: r.zubereitung || '', quelle: 'gespeichert', naehrstoffe: r.naehrstoffe || {} };
+
+  // Card DOM updaten
+  const card = document.getElementById('card-' + idx);
+  if (card) {
+    const nw = r.naehrstoffe || {};
+    const nwHtml = (nw.kalorien||nw.protein) ? `<div style="display:flex;gap:8px;font-size:11px;color:var(--muted);margin-top:4px">${nw.kalorien?`<span>🔥 ${nw.kalorien} kcal</span>`:''}${nw.protein?`<span>💪 ${nw.protein}g P</span>`:''}</div>` : '';
+    const saveId = `savebtn-direkt-${idx}`;
+    const rezeptData = JSON.stringify(planCards[idx]).replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:4px"><span class="drag-handle">⠿</span>
+        <div class="plan-mahlzeit">${m.mahlzeit} · <span style="color:#4C3DB5;font-size:10px">📖</span></div></div>
+        <div style="display:flex;gap:4px">
+          <button class="btn-icon" onclick="regenMeal(${idx})" style="font-size:11px">↺</button>
+          <button class="btn-icon" onclick="deleteMealAndUpdateList(${idx})" style="font-size:11px">✕</button>
+        </div>
+      </div>
+      <div class="plan-titel">${r.titel}</div>
+      <div class="plan-desc">${r.beschreibung||''}</div>
+      ${nwHtml}
+      <div class="plan-zutaten" style="margin-top:4px">${(r.zutaten||[]).map(z=>z.name).join(' · ')}</div>
+      <div class="plan-actions">
+        <button class="btn-small" id="${saveId}" onclick="savePlanRezept(${rezeptData},'${saveId}')">🔖</button>
+        <button class="btn-small" id="gekocht-${idx}" onclick="openGekocht(${idx})">✓ Gekocht</button>
+      </div>`;
+  }
+  updateEinkaufslisteNachAenderung();
+  btn.closest('div[style*=fixed]').remove();
 }
 
 function onDragStart(e, idx) {
