@@ -654,12 +654,13 @@ def mealplan():
         '"zutaten":[{"name":"Apfel","menge":"1 Stueck (150g)","kaufen":false}],'
         '"naehrstoffe":{"kalorien":80,"protein":1,"kohlenhydrate":20,"fett":0}}'
     )
+    budget_warnung = ""
     if budget > 0:
         budget_pro_tag = budget / tage
         if budget_pro_tag < 3:
-            budget_warnung = f"BUDGET_WARNUNG: {budget:.2f}€ für {tage} Tage ist sehr knapp (ca. {budget_pro_tag:.2f}€/Tag). Die App wird versuchen es einzuhalten, aber es kann schwierig sein."
+            budget_warnung = f"BUDGET_WARNUNG: {budget:.2f}€ für {tage} Tage ist sehr knapp (ca. {budget_pro_tag:.2f}€/Tag)."
         elif budget_pro_tag < 5:
-            budget_warnung = f"Budget ist moderat ({budget_pro_tag:.2f}€/Tag) - einfache, günstige Zutaten bevorzugen."
+            budget_warnung = f"Budget ist moderat ({budget_pro_tag:.2f}€/Tag) - günstige Zutaten bevorzugen."
 
     items = InventarItem.query.all()
     if not items:
