@@ -529,6 +529,7 @@ let planCardIndex = 0;
 let planCards = {};
 let dragSrcIdx = null;
 let currentPlanData = null;
+let preisCache = {}; // name.lower -> preis (persistiert über regen)
 
 async function init() {
   await loadInventar();
@@ -1259,6 +1260,7 @@ function renderMealPlan(data) {
       html += `<div class="einkauf-kategorie" data-kategorie="${kategorie}"><h4>${kategorie}</h4>`;
       for (const item of items) {
         const idx = einkaufItemCount++;
+        if (item.preis_ca) preisCache[item.name.toLowerCase()] = item.preis_ca;
         html += renderEinkaufItem(idx, item.name, item.menge, item.preis_ca, item.typ||'fehlend');
       }
       html += '</div>';
@@ -1864,61 +1866,51 @@ function deleteMealAndUpdateList(idx) {
 }
 
 function updateEinkaufslisteNachAenderung() {
-  const invNames = new Set(inventory.map(i => i.name.toLowerCase()));
   const wrapper = document.getElementById('einkaufsliste-wrapper');
   if (!wrapper) return;
 
-  // Alle Zutatennamen die der aktuelle Plan braucht (kaufen:true ODER nicht im Inventar)
-  const needed = new Set();
+  const invNames = new Set(inventory.map(i => i.name.toLowerCase()));
+  const grundzutaten = new Set(['salz','pfeffer','öl','oel','olivenöl','olivenoel','zucker','wasser',
+    'butter','mehl','backpulver','natron','essig','senf','speiseöl','sonnenblumenöl','rapsöl']);
+
+  // Welche Zutaten müssen aktuell gekauft werden (aus allen planCards)
+  const needed = {}; // name.lower -> {name, menge, preis}
   Object.values(planCards).forEach(m => {
+    if (m.quelle === 'meal_prep') return;
     (m.zutaten || []).forEach(z => {
-      if (z.kaufen === true || (z.kaufen !== false && !invNames.has(z.name.toLowerCase()))) {
-        needed.add(z.name.toLowerCase());
+      const zn = z.name.toLowerCase();
+      if (grundzutaten.has(zn)) return;
+      const kaufen = z.kaufen === true || (z.kaufen !== false && !invNames.has(zn));
+      if (kaufen && !needed[zn]) {
+        needed[zn] = { name: z.name, menge: z.menge || '', preis: preisCache[zn] || 0 };
       }
     });
   });
 
-  // Items mit data-typ="fehlend" nur entfernen wenn Zutat weder im Plan noch mehr nötig
-  // ABER: Items die vom Backend kommen (initialLoad) nicht entfernen - nur neu hinzugefügte
-  wrapper.querySelectorAll('.einkauf-item[data-typ="fehlend"][data-source="regen"]').forEach(item => {
+  // Vorhandene fehlend-Items: überflüssige entfernen
+  wrapper.querySelectorAll('.einkauf-item[data-typ="fehlend"]').forEach(item => {
     const name = item.dataset.name || '';
-    if (!needed.has(name)) {
+    if (needed[name]) {
+      delete needed[name]; // bereits vorhanden → nicht nochmal hinzufügen
+    } else {
       delete einkaufPreise[parseInt(item.id.replace('einkauf-', ''))];
       item.remove();
     }
   });
 
-  // Neue Zutaten hinzufügen die noch nicht auf der Liste stehen
-  const vorhandenNamen = new Set();
-  wrapper.querySelectorAll('.einkauf-item').forEach(item => {
-    vorhandenNamen.add(item.dataset.name || '');
-  });
-
-  for (const cardMeal of Object.values(planCards)) {
-    for (const z of (cardMeal.zutaten || [])) {
-      const zn = z.name.toLowerCase();
-      if ((z.kaufen === true) && !vorhandenNamen.has(zn) && !invNames.has(zn)) {
-        let targetKat = wrapper.querySelector('[data-kategorie="Neu"]');
-        if (!targetKat) {
-          targetKat = document.createElement('div');
-          targetKat.className = 'einkauf-kategorie';
-          targetKat.dataset.kategorie = 'Neu';
-          targetKat.innerHTML = '<h4>Neue Zutaten</h4>';
-          wrapper.prepend(targetKat);
-        }
-        const idx = einkaufItemCount++;
-        const itemHtml = renderEinkaufItem(idx, z.name, z.menge || '', 0, 'fehlend');
-        // data-source="regen" markieren damit wir es später entfernen können
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = itemHtml;
-        const newItem = tempDiv.firstElementChild;
-        if (newItem) {
-          newItem.dataset.source = 'regen';
-          targetKat.appendChild(newItem);
-        }
-        vorhandenNamen.add(zn);
-      }
+  // Neue fehlende Zutaten hinzufügen
+  for (const z of Object.values(needed)) {
+    let kat = wrapper.querySelector('[data-kategorie="Neue Zutaten"]');
+    if (!kat) {
+      kat = document.createElement('div');
+      kat.className = 'einkauf-kategorie';
+      kat.dataset.kategorie = 'Neue Zutaten';
+      kat.innerHTML = '<h4>Neue Zutaten</h4>';
+      wrapper.prepend(kat);
     }
+    const idx = einkaufItemCount++;
+    if (z.preis) preisCache[z.name.toLowerCase()] = z.preis;
+    kat.insertAdjacentHTML('beforeend', renderEinkaufItem(idx, z.name, z.menge, z.preis, 'fehlend'));
   }
 
   // Leere Kategorien entfernen
