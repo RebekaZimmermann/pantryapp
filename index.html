@@ -1197,14 +1197,15 @@ function renderMealPlan(data) {
     html += '</div>'; // close dropzone
     // Tages-Makro-Summe
     const tagsMahlzeiten = mahlzeiten.filter(m => m.quelle !== 'meal_prep');
+    const mealPrepToggle = document.getElementById('meal-prep-toggle')?.checked;
     const tagesKcal = tagsMahlzeiten.reduce((s, m) => {
       const nw = m.naehrstoffe || {};
-      const f = (!isMealPrep && m.mahlzeit === 'Abendessen' && document.getElementById('meal-prep-toggle')?.checked) ? 0.5 : 1;
+      const f = (m.mahlzeit === 'Abendessen' && mealPrepToggle) ? 0.5 : 1;
       return s + Math.round((nw.kalorien || 0) * f);
     }, 0);
     const tagesProt = tagsMahlzeiten.reduce((s, m) => {
       const nw = m.naehrstoffe || {};
-      const f = (!isMealPrep && m.mahlzeit === 'Abendessen' && document.getElementById('meal-prep-toggle')?.checked) ? 0.5 : 1;
+      const f = (m.mahlzeit === 'Abendessen' && mealPrepToggle) ? 0.5 : 1;
       return s + Math.round((nw.protein || 0) * f);
     }, 0);
     if (tagesKcal > 0) {
