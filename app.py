@@ -271,7 +271,7 @@ def meal_gekocht():
         verb_zahl, verb_einheit = parse_menge(verbrauch_menge)
 
         if inv_zahl is not None and verb_zahl is not None and inv_einheit == verb_einheit:
-            # Beide haben gleiche Einheit → direkte Subtraktion
+            # Beide haben gleiche Einheit -> direkte Subtraktion
             rest = inv_zahl - (verb_zahl * portionen)
             if rest <= 0:
                 return None  # Komplett verbraucht
@@ -345,7 +345,7 @@ def meal_gekocht():
             if inv_anteil is not None:
                 rest_anteil = inv_anteil - verbrauch_gesamt
             else:
-                # Inventar hat keine Anteilsangabe → assume voll
+                # Inventar hat keine Anteilsangabe -> assume voll
                 rest_anteil = 1.0 - verbrauch_gesamt
 
             if rest_anteil <= 0.05:
@@ -543,11 +543,11 @@ def mealplan():
 
     ernaehrung_map = {
         'alles': 'keine Einschränkungen',
-        'vegetarisch': 'vegetarisch – kein Fleisch, kein Fisch',
-        'vegan': 'vegan – keine tierischen Produkte',
-        'pescetarisch': 'pescetarisch – kein Fleisch, aber Fisch erlaubt',
+        'vegetarisch': 'vegetarisch - kein Fleisch, kein Fisch',
+        'vegan': 'vegan - keine tierischen Produkte',
+        'pescetarisch': 'pescetarisch - kein Fleisch, aber Fisch erlaubt',
         'kein_schwein': 'kein Schweinefleisch',
-        'kein_rohes_fleisch': 'kein rohes Fleisch zum Zubereiten (kein Hackfleisch, kein rohes Hähnchen/Rind/Schwein zum Kochen) – aber Aufschnitt, Bacon, Wurst, TK-vorgegartes Fleisch ist erlaubt'
+        'kein_rohes_fleisch': 'kein rohes Fleisch zum Zubereiten (kein Hackfleisch, kein rohes Hähnchen/Rind/Schwein zum Kochen) - aber Aufschnitt, Bacon, Wurst, TK-vorgegartes Fleisch ist erlaubt'
     }
     ernaehrung_text = ernaehrung_map.get(ernaehrung, 'keine Einschränkungen')
 
@@ -569,9 +569,9 @@ def mealplan():
             if t not in [x.lower() for x in tools]:
                 nicht_vorhanden.append(t)
         if nicht_vorhanden:
-            tools_verboten = f"NICHT VERFÜGBAR – keine Rezepte die diese Geräte benötigen: {', '.join(nicht_vorhanden)}"
-    mag_nicht_text = f"Mag NICHT – niemals verwenden: {mag_nicht}" if mag_nicht.strip() else ""
-    mag_text = f"Mag besonders gerne – bevorzuge diese: {mag}" if mag.strip() else ""
+            tools_verboten = f"NICHT VERFÜGBAR - keine Rezepte die diese Geräte benötigen: {', '.join(nicht_vorhanden)}"
+    mag_nicht_text = f"Mag NICHT - niemals verwenden: {mag_nicht}" if mag_nicht.strip() else ""
+    mag_text = f"Mag besonders gerne - bevorzuge diese: {mag}" if mag.strip() else ""
 
     # Gespeicherte Rezepte als Stil-Referenz laden
     alle_gespeicherten_titel = []
@@ -591,16 +591,75 @@ def mealplan():
         if ziel_kohlenhydrate: macro_parts.append(f"{ziel_kohlenhydrate}g Kohlenhydrate")
         if ziel_fett: macro_parts.append(f"{ziel_fett}g Fett")
         mahlzeiten_faktor = mahlzeiten_pro_tag if mahlzeiten_pro_tag > 0 else 2
-        macro_text = f"Macro-Ziele pro TAG: {', '.join(macro_parts)} – verteile dies auf {mahlzeiten_faktor} Mahlzeiten"
+        macro_text = f"Macro-Ziele pro TAG: {', '.join(macro_parts)} - verteile dies auf {mahlzeiten_faktor} Mahlzeiten"
 
-    # Budget-Check: realistisch?
-    budget_warnung = ""
+    # Fleisch-Einschränkung global berechnen
+    fleisch_einschraenkung = ""
+    if ernaehrung == 'kein_rohes_fleisch':
+        fleisch_einschraenkung = "FLEISCH: Kein rohes Fleisch (kein Hackfleisch, keine rohe Haehnchenbrust). Erlaubt: Aufschnitt, Bacon, TK-Gefluegel (vorgegart)."
+    elif ernaehrung == 'vegetarisch':
+        fleisch_einschraenkung = "KEIN Fleisch, KEIN Fisch - STRIKT einhalten."
+    elif ernaehrung == 'vegan':
+        fleisch_einschraenkung = "KEINE tierischen Produkte - STRIKT einhalten."
+
+    # Prompt-Variablen (als einfache Strings, keine f-triple-strings)
+    phase1_system_prompt = (
+        "Du bist ein Koch und planst eine Mahlzeit fuer eine Person.\n"
+        "ERNAEHRUNG: " + ernaehrung_text + " - STRIKT einhalten.\n"
+        + (fleisch_einschraenkung + "\n" if fleisch_einschraenkung else "")
+        + "SCHWIERIGKEIT: " + schwierigkeit_text + "\n"
+        + cuisines_text + "\n"
+        + (mag_nicht_text + "\n" if mag_nicht_text else "")
+        + (mag_text + "\n" if mag_text else "")
+        + "VORGEHEN:\n"
+        "1. Waehle ein leckeres, bekanntes Gericht das zu den Inventar-Zutaten passt\n"
+        "2. Nutze Inventar-Zutaten NUR wenn sie zum Gericht passen\n"
+        "3. NIEMALS unpassende Zutaten kombinieren (kein Parmesan in Pancakes, kein Kaese zu Beeren)\n"
+        "4. Dringende Zutaten priorisieren wenn sie zum Gericht passen\n"
+        "5. Abwechslungsreich - nicht dasselbe wie bereits geplant\n"
+        'NUR JSON: {"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","kueche":"deutsch",'
+        '"zutaten":[{"name":"Spinat","menge":"ganze Tuete","kaufen":false}],'
+        '"zubereitung":"Schritt 1...","naehrstoffe":{"kalorien":400,"protein":25,"kohlenhydrate":40,"fett":12}}'
+    )
+
+    phase2_system_prompt = (
+        "Du bist ein Koch und planst eine Mahlzeit fuer eine Person in Deutschland.\n"
+        "ERNAEHRUNG: " + ernaehrung_text + " - STRIKT einhalten.\n"
+        + (fleisch_einschraenkung + "\n" if fleisch_einschraenkung else "")
+        + "SCHWIERIGKEIT: " + schwierigkeit_text + "\n"
+        + cuisines_text + "\n"
+        + (mag_nicht_text + "\n" if mag_nicht_text else "")
+        + (mag_text + "\n" if mag_text else "")
+        + (style_text + "\n" if style_text else "")
+        + (macro_text + "\n" if macro_text else "")
+        + "VORGEHEN:\n"
+        "1. Waehle ein konkretes, leckeres Gericht aus der gewuenschten Kueche\n"
+        "2. Nutze Inventar-Zutaten nur wenn sie wirklich passen\n"
+        "3. NIEMALS unpassende Zutaten kombinieren\n"
+        "4. Realistische Mengen: 150-200g Protein, 80-100g Nudeln/Reis\n"
+        "5. Handelsübliche Packungsgroessen bei Einkauf\n"
+        "6. Budget einhalten\n"
+        'NUR JSON: {"titel":"Name","zeit":"25 Min","beschreibung":"X","kueche":"italienisch",'
+        '"zutaten":[{"name":"Hahnchen","menge":"1 Stueck (150g)","kaufen":true}],'
+        '"zubereitung":"Schritt 1...","naehrstoffe":{"kalorien":550,"protein":35,"kohlenhydrate":60,"fett":15}}'
+    )
+
+    snack_system_prompt = (
+        "Gesunder, einfacher Snack fuer 1 Person. "
+        "ERNAEHRUNG: " + ernaehrung_text + ". "
+        + (mag_nicht_text if mag_nicht_text else "") + "\n"
+        "Nur bekannte, realistische Snacks.\n"
+        "WICHTIG: Genaue Mengenangaben. kaufen:false wenn im Inventar.\n"
+        'NUR JSON: {"titel":"Name","zeit":"2 Min","beschreibung":"Kurz",'
+        '"zutaten":[{"name":"Apfel","menge":"1 Stueck (150g)","kaufen":false}],'
+        '"naehrstoffe":{"kalorien":80,"protein":1,"kohlenhydrate":20,"fett":0}}'
+    )
     if budget > 0:
         budget_pro_tag = budget / tage
         if budget_pro_tag < 3:
             budget_warnung = f"BUDGET_WARNUNG: {budget:.2f}€ für {tage} Tage ist sehr knapp (ca. {budget_pro_tag:.2f}€/Tag). Die App wird versuchen es einzuhalten, aber es kann schwierig sein."
         elif budget_pro_tag < 5:
-            budget_warnung = f"Budget ist moderat ({budget_pro_tag:.2f}€/Tag) – einfache, günstige Zutaten bevorzugen."
+            budget_warnung = f"Budget ist moderat ({budget_pro_tag:.2f}€/Tag) - einfache, günstige Zutaten bevorzugen."
 
     items = InventarItem.query.all()
     if not items:
@@ -721,7 +780,7 @@ def mealplan():
             rezept = {
                 'titel': titel, 'beschreibung': gr.beschreibung or '',
                 'zutaten': zutaten, 'zubereitung': gr.zubereitung or '',
-                'zeit': '–', 'tag': tag, 'mahlzeit': mahlzeit_label,
+                'zeit': '-', 'tag': tag, 'mahlzeit': mahlzeit_label,
                 'quelle': 'gespeichert', 'naehrstoffe': {}, 'ersatz': braucht_ersatz
             }
             plan.append(rezept)
@@ -737,7 +796,7 @@ def mealplan():
 
         try:
             if phase2:
-                # Phase 2: Freie Planung – abwechslungsreich, ausgewogen, budget-bewusst
+                # Phase 2: Freie Planung - abwechslungsreich, ausgewogen, budget-bewusst
                 budget_pro_mahlzeit = (budget / total) if budget > 0 else 0
                 inv_rest = ', '.join([f"{x['menge']} {x['name']}" for x in virtual_inventory]) if virtual_inventory else 'nichts mehr'
                 is_snack = mahlzeit_label == 'Snack'
@@ -767,7 +826,7 @@ ERNÄHRUNG: {ernaehrung_text}
 Generiere GENAU 1 Snack-Vorschlag als JSON.
 - Gesund, sättigend, einfach zuzubereiten
 - Wenn möglich Obst einbauen (Apfel, Banane, Beeren, etc.)
-- Nur bekannte, alltagstaugliche Snacks – keine seltsamen Kombinationen
+- Nur bekannte, alltagstaugliche Snacks - keine seltsamen Kombinationen
 - Kein Kochen nödig oder max. 5 Min
 - Korrekte deutsche Umlaute, NUR JSON
 Format: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"name":"Apfel","menge":"1 Stück","kaufen":true}}],"zubereitung":"Kurz","naehrstoffe":{{"kalorien":150,"protein":3,"kohlenhydrate":25,"fett":2}}}}"""},
@@ -790,56 +849,27 @@ Snack für Tag {tag}. Einfach, gesund, mit Obst wenn möglich."""}
                             if z.get('kaufen', False):
                                 verplante_zutaten.add(z['name'].lower())
 
-                    # Cuisines die schon vertreten sind
+                    # Cuisines rotieren
                     used_cuisines = [m.get('kueche', '') for m in plan if m.get('kueche')]
                     next_cuisine = ''
                     if cuisines:
                         unused = [c for c in cuisines if c not in used_cuisines]
                         next_cuisine = unused[0] if unused else cuisines[i % len(cuisines)]
 
-                    # Explizite Fleisch-Einschränkung für Phase 2
-                    fleisch_einschraenkung = ""
-                    if ernaehrung == 'kein_rohes_fleisch':
-                        fleisch_einschraenkung = "FLEISCH: Kein rohes Fleisch zum Selberzubereiten (kein Hackfleisch, keine rohe Hähnchenbrust, kein rohes Rindfleisch). Erlaubt: Aufschnitt, Bacon, Würstchen, TK-Geflügel (vorgegart), Fischstäbchen."
-                    elif ernaehrung == 'vegetarisch':
-                        fleisch_einschraenkung = "KEIN Fleisch, KEIN Fisch – STRIKT einhalten."
-                    elif ernaehrung == 'vegan':
-                        fleisch_einschraenkung = "KEINE tierischen Produkte – STRIKT einhalten."
-
                     response = client.chat.completions.create(
                         model='gpt-4o', max_tokens=900,
                         messages=[
-                            {"role": "system", "content": f"""Du planst Mahlzeiten für eine Person in Deutschland. Generiere GENAU 1 Rezept als JSON.
-
-ERNÄHRUNG: {ernaehrung_text} – STRIKT einhalten.
-{fleisch_einschraenkung}
-SCHWIERIGKEIT: {schwierigkeit_text}
-{cuisines_text}
-{mag_nicht_text}
-{mag_text}
-{style_text}
-{macro_text}
-
-WICHTIGE REGELN:
-- Gängige, alltagstaugliche Gerichte – keine exotischen Geheimrezepte
-- Jede Mahlzeit: Protein + Gemüse + Kohlenhydrate in realistischen Mengen für 1 Person
-- Mengen für 1 Person: z.B. 150-200g Hähnchen, 80-100g Nudeln/Reis – KEINE 1kg Mengen
-- Einkaufsmengen: ganze handelsübliche Einheiten (z.B. "1 Packung Nudeln 500g", "1 Dose Tomaten 400g")
-- Budget einhalten: günstige Alltagszutaten wählen wenn Budget knapp
-- "kaufen":true für neue Zutaten, "kaufen":false für Inventar-Zutaten
-- Korrekte deutsche Umlaute, NUR JSON
-
-Format: {{"titel":"Name","zeit":"25 Min","beschreibung":"Appetitliche Beschreibung","kueche":"italienisch","zutaten":[{{"name":"Hähnchenbrust","menge":"1 Stück (ca. 150g)","kaufen":true}},{{"name":"Nudeln","menge":"1 Packung (500g)","kaufen":false}}],"zubereitung":"Schritt 1: ...","naehrstoffe":{{"kalorien":550,"protein":35,"kohlenhydrate":60,"fett":15}}}}"""},
-                            {"role": "user", "content": f"""Inventar (kostenlos nutzbar): {inv_rest}
-Budget pro Mahlzeit: {f'ca. {budget_pro_mahlzeit:.2f} €' if budget_pro_mahlzeit > 0 else 'günstig kochen'}
-Heute geplant: {todays_titles}
-Alle bisher geplanten Gerichte (NICHT wiederholen): {already_planned}
-Küchen bisher vertreten: {', '.join(used_cuisines) if used_cuisines else 'keine'}
-Mahlzeit: Tag {tag} von {tage}, {mahlzeit_label}{meal_prep_hinweis}
-{f'Bevorzugte Küche für dieses Gericht: {next_cuisine}' if next_cuisine else ''}
-
-Realistische Portionsgröße für 1 Person. Abwechslungsreich zu bisherigen Gerichten.
-WICHTIG: Nur Zutaten kombinieren die kulinarisch wirklich zusammenpassen. Kein Käse in Obstspeisen, kein Parmesan in Pancakes etc."""}
+                            {"role": "system", "content": phase2_system_prompt},
+                            {"role": "user", "content": (
+                                f"Inventar (kostenlos nutzbar): {inv_rest}\n"
+                                f"Budget pro Mahlzeit: {f'ca. {budget_pro_mahlzeit:.2f} EUR' if budget_pro_mahlzeit > 0 else 'guenstig kochen'}\n"
+                                f"Heute geplant: {todays_titles}\n"
+                                f"Alle bisher geplanten Gerichte (NICHT wiederholen): {already_planned}\n"
+                                f"Kuechen bisher: {', '.join(used_cuisines) if used_cuisines else 'keine'}\n"
+                                f"Mahlzeit: Tag {tag} von {tage}, {mahlzeit_label}{meal_prep_hinweis}\n"
+                                f"{f'Bevorzugte Kueche: {next_cuisine}' if next_cuisine else ''}\n"
+                                "Realistische Portionsgroesse. Nur Zutaten kombinieren die kulinarisch zusammenpassen."
+                            )}
                         ]
                     )
             else:
@@ -868,23 +898,8 @@ WICHTIG: Nur Zutaten kombinieren die kulinarisch wirklich zusammenpassen. Kein K
                 response = client.chat.completions.create(
                     model='gpt-4o', max_tokens=800,
                     messages=[
-                        {"role": "system", "content": f"""Du planst Mahlzeiten für eine Person.
-Generiere GENAU 1 Rezept als JSON.
-ERNÄHRUNG: {ernaehrung_text} – STRIKT einhalten.
-{fleisch_einschraenkung if 'fleisch_einschraenkung' in dir() else ''}
-SCHWIERIGKEIT: {schwierigkeit_text}
-{cuisines_text}
-{mag_nicht_text}
-{mag_text}
-REGELN:
-- Verwende Zutaten aus dem Inventar NUR wenn sie kulinarisch sinnvoll zusammenpassen
-- NIEMALS Zutaten kombinieren die nicht zusammengehören (z.B. Parmesan in Pancakes, Käse in Obstsalat)
-- Dringende Zutaten priorisieren, aber nur wenn sie zum Gericht passen
-- Abwechslungsreich – nicht dasselbe wie bereits geplant
-- Realistische Portionsgrößen für 1 Person
-- Korrekte deutsche Umlaute, NUR JSON
-Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","kueche":"deutsch","zutaten":[{{"name":"Spinat","menge":"ganze Tüte","urgency":"soon","kaufen":false}}],"zubereitung":"Schritt 1: ...","naehrstoffe":{{"kalorien":400,"protein":25,"kohlenhydrate":40,"fett":12}}}}"""},
-                        {"role": "user", "content": f"Inventar:\n{chr(10).join(inv_parts)}\n\nBereits geplant: {already_planned}\nTag {tag} von {tage}, {mahlzeit_label}{urgency_instruction}{kein_einkauf_hinweis}\n\nWichtig: Nur Zutaten verwenden die geschmacklich wirklich zusammenpassen!"}
+                        {"role": "system", "content": phase1_system_prompt},
+                                                {"role": "user", "content": f"Verfügbares Inventar:\n{chr(10).join(inv_parts)}\n\nBereits geplant: {already_planned}\nTag {tag} von {tage}, {mahlzeit_label}{urgency_instruction}{kein_einkauf_hinweis}"}
                     ]
                 )
 
@@ -904,7 +919,7 @@ Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","kueche":"deutsch
                         z['menge'] = menge.replace(m.group(0), f'{min(gramm, 150)}g')
                     elif gramm > 400 and any(w in name_lower for w in ['gemüse', 'spinat', 'brokkoli', 'karott', 'zucchini']):
                         z['menge'] = menge.replace(m.group(0), f'{min(gramm, 200)}g')
-                # kg → g wenn > 0.5 kg für Einzelzutaten
+                # kg -> g wenn > 0.5 kg für Einzelzutaten
                 m_kg = re.search(r'(\d+(?:[.,]\d+)?)\s*kg', menge, re.IGNORECASE)
                 if m_kg:
                     kg = float(m_kg.group(1).replace(',', '.'))
@@ -920,7 +935,7 @@ Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","kueche":"deutsch
                 zn = zutat['name'].lower()
                 zm = zutat.get('menge', '').lower()
                 if zutat.get('kaufen', False):
-                    continue  # Neue Zutat – nicht im Inventar
+                    continue  # Neue Zutat - nicht im Inventar
                 for inv_item in list(virtual_inventory):
                     if inv_item['name'].lower() == zn:
                         if any(w in zm for w in ['ganz', 'alles', 'alle', 'komplett', 'gesamt']):
@@ -954,13 +969,8 @@ Format: {{"titel":"Name","zeit":"20 Min","beschreibung":"Kurz","kueche":"deutsch
                 response = client.chat.completions.create(
                     model='gpt-4o', max_tokens=500,
                     messages=[
-                        {"role": "system", "content": f"""Gesunder, einfacher Snack für 1 Person in Deutschland. ERNÄHRUNG: {ernaehrung_text}. {mag_nicht_text}
-Nur bekannte, realistische Snacks ohne seltsame Kombinationen.
-Gute Beispiele: 1 Apfel, 1 Banane, 30g Nüsse, 150g Naturjoghurt mit Beeren, 2 Möhren mit 2 EL Hummus, 2 Reiswaffeln mit Frischkäse.
-WICHTIG: Genaue Mengenangaben für jede Zutat (z.B. "1 Stück", "150g", "2 EL", "30g").
-"kaufen": false wenn Zutat im Inventar, true wenn neu kaufen.
-NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"name":"Apfel","menge":"1 Stück (ca. 150g)","kaufen":false}},{{"name":"Erdnussbutter","menge":"1 EL (ca. 15g)","kaufen":true}}],"zubereitung":"Kurz"}}"""},
-                        {"role": "user", "content": f"Inventar (kaufen:false für diese): {inv_rest}\n{snack_budget_info}\nBisherige Snacks (nicht wiederholen): {', '.join(already_snacks)}\nSnack für Tag {tag}."}
+                        {"role": "system", "content": snack_system_prompt},
+                        {"role": "user", "content": f"Inventar (kaufen:false): {inv_rest}\n{snack_budget_info}\nBisherige Snacks: {', '.join(already_snacks)}\nSnack fuer Tag {tag}."}
                     ]
                 )
                 text = response.choices[0].message.content.replace('```json','').replace('```','').strip()
@@ -979,7 +989,7 @@ NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"na
                 plan.append({'tag': tag, 'mahlzeit': 'Snack', 'titel': 'Snack', 'beschreibung': str(e), 'zutaten': [], 'zubereitung': '', 'quelle': 'ki', 'phase': 2})
 
     # Einkaufsliste & Extra-Zutaten
-    # Meal Prep Kopien ausschließen – sie kochen dieselbe Portion wie das Abendessen
+    # Meal Prep Kopien ausschließen - sie kochen dieselbe Portion wie das Abendessen
     plan_ohne_meal_prep = [m for m in plan if m.get('quelle') != 'meal_prep']
 
     # Inventar-Zutaten die im Plan mehr gebraucht werden als vorhanden
@@ -999,7 +1009,7 @@ NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"na
             if inv_match:
                 mehrfach_benoetigt.append(
                     f"{inv_match.name}: im Inventar {inv_match.menge}, "
-                    f"benötigt in {len(mengen)} Rezepten: {', '.join(mengen)} → "
+                    f"benötigt in {len(mengen)} Rezepten: {', '.join(mengen)} -> "
                     f"falls Gesamtmenge das Inventar übersteigt, fehlende Menge auf Einkaufsliste"
                 )
 
@@ -1017,6 +1027,33 @@ NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"na
     mehrfach_text = ('Mehrfach benötigte Inventar-Zutaten (extra Menge kaufen): ' + '; '.join(mehrfach_benoetigt)) if mehrfach_benoetigt else ''
     budget_text = f"Budget für Einkauf: {budget:.2f} EUR" if budget > 0 else "Kein Budget festgelegt"
 
+    einkauf_system_prompt = (
+        "Du bist Einkaufsplaner fuer Deutschland (REWE). Antworte NUR mit validem JSON.\n"
+        "REGELN:\n"
+        "- einkaufsliste: NUR Zutaten die im Plan benoetigt aber NICHT im Inventar sind (typ: fehlend)\n"
+        "- KRITISCH: Menge = kleinste handelsübliche Verpackungseinheit:\n"
+        "  Eier: 6 Stueck (1 Packung), niemals 1 oder 2 Stueck\n"
+        "  Milch: 1 Liter, niemals 200ml\n"
+        "  Mehl/Nudeln/Reis/Linsen: 500g-1kg Packung, niemals 80g oder 100g\n"
+        "  Joghurt: 500g Becher, niemals 150g\n"
+        "  Kaese: 150-200g Packung, niemals 30g\n"
+        "  Tomaten (Dose): 400g Dose\n"
+        "  Gemuese: reale Stueckzahl (1 Bund Moehren, 1 Stueck Brokkoli)\n"
+        "  Fleisch/Fisch: 1 Packung ca. 400g\n"
+        "- Preis = Preis fuer die gesamte Verpackung\n"
+        "- extra_zutaten: optionale Zutaten die ein KONKRETES Rezept aufwerten - rezept Feld pflicht\n"
+        "- Grundzutaten Wasser/Salz/Pfeffer/Oel/Zucker NIEMALS vorschlagen\n"
+        "- Korrekte deutsche Umlaute, realistische REWE-Preise\n"
+        "- Fuer extra_zutaten: naehrstoffe_zusatz als Text z.B. +8g Protein +120 kcal\n"
+        'Format: {"extra_zutaten":[{"name":"Parmesan","menge":"100g Stueck","preis_ca":2.49,'
+        '"grund":"Macht Pasta cremiger","rezept":"Pasta","kategorie":"Kuehlregal",'
+        '"naehrstoffe_zusatz":"+8g Protein"}],'
+        '"einkaufsliste":{"Obst & Gemuese":[{"name":"Eier","menge":"6 Stueck (1 Packung)",'
+        '"preis_ca":1.99,"typ":"fehlend"}],"Kuehlregal":[],"Tiefkuehl":[],'
+        '"Brot & Backwaren":[],"Trockenwaren":[],"Getraenke":[],"Sonstiges":[]},'
+        '"budget_verwendet":5.00,"budget_gesamt":20.00}'
+    )
+
     einkaufsliste = {}
     extra_zutaten = []
     budget_verwendet = 0
@@ -1025,40 +1062,17 @@ NUR JSON: {{"titel":"Name","zeit":"2 Min","beschreibung":"Kurz","zutaten":[{{"na
         response = client.chat.completions.create(
             model='gpt-4o', max_tokens=1500,
             messages=[
-                {"role": "system", "content": """Du bist Einkaufsplaner für Deutschland (REWE). Antworte NUR mit validem JSON.
-REGELN:
-- einkaufsliste: NUR Zutaten die im Plan benötigt aber NICHT im Inventar sind (typ: fehlend)
-- KRITISCH: Menge = die kleinste handelsübliche Verpackungseinheit die man im Supermarkt kaufen kann:
-  * Eier → "6 Stück (1 Packung)" niemals "1 Stück" oder "2 Stück"
-  * Milch → "1 Liter (1 Packung)" niemals "200ml"
-  * Mehl → "1 kg (1 Packung)" niemals "100g"
-  * Nudeln/Reis/Linsen → "500g (1 Packung)" niemals "80g"
-  * Joghurt → "500g Becher" niemals "150g"
-  * Käse → "150g oder 200g Packung" niemals "30g"
-  * Tomaten (Dose) → "400g Dose" niemals "100g"
-  * Frisches Gemüse → reale Stückzahl/Bund die man kauft (z.B. "1 Bund Möhren", "1 Stück Brokkoli")
-  * Fleisch/Fisch → "1 Packung (ca. 400g)" niemals "150g"
-- Preis = Preis für die gesamte Verpackungseinheit, nicht für die Rezeptmenge
-- extra_zutaten: optionale Zutaten die ein KONKRETES Rezept aufwerten - "rezept" Feld pflicht
-- Grundzutaten wie Wasser, Salz, Pfeffer, Öl, Zucker NIEMALS vorschlagen
-- Korrekte deutsche Umlaute, realistische REWE-Preise
-- Für extra_zutaten: naehrstoffe_zusatz als Text (z.B. "+8g Protein, +120 kcal")
-Format: {"extra_zutaten":[{"name":"Parmesan","menge":"1 Stück (ca. 100g)","preis_ca":2.49,"grund":"Macht die Pasta cremiger","rezept":"Pasta mit Tomaten","kategorie":"Kühlregal","naehrstoffe_zusatz":"+8g Protein, +120 kcal"}],"einkaufsliste":{"Obst & Gemüse":[{"name":"Eier","menge":"6 Stück (1 Packung)","preis_ca":1.99,"typ":"fehlend"}],"Kühlregal":[],"Tiefkühl":[],"Brot & Backwaren":[],"Trockenwaren & Konserven":[],"Getränke":[],"Sonstiges":[]},"budget_verwendet":5.00,"budget_gesamt":20.00}"""},
-                {"role": "user", "content": f"""Inventar (vorhanden, NICHT auf Liste): {all_items_text}
-
-Geplante Mahlzeiten mit Zutaten und Mengen:
-{plan_zutaten_text}
-
-Fehlende Zutaten (bereits auf Liste, NICHT als Extra): {fehlende_namen}
-{mehrfach_text}
-{budget_text}
-
-Aufgaben:
-1. Einkaufsliste: NUR Zutaten die im Plan benötigt aber NICHT im Inventar sind (kein Wasser/Salz/Pfeffer/Öl)
-2. Falls Inventar-Zutaten mehrfach gebraucht werden: zusätzliche Menge als typ "fehlend" auf die Liste
-3. Extra-Vorschläge: 2-3 Zutaten die ein KONKRETES geplantes Rezept aufwerten - mit exaktem Rezeptnamen
-4. Budget beachten, fehlende Zutaten haben Priorität
-5. Realistische REWE-Preise, korrekte Umlaute"""}
+                {"role": "system", "content": einkauf_system_prompt},
+                {"role": "user", "content": (
+                    f"Inventar (vorhanden, NICHT auf Liste): {all_items_text}\n\n"
+                    f"Geplante Mahlzeiten:\n{plan_zutaten_text}\n\n"
+                    f"Fehlende Zutaten: {fehlende_namen}\n"
+                    f"{mehrfach_text}\n{budget_text}\n\n"
+                    "Aufgaben: 1. Nur fehlende Zutaten auf Liste "
+                    "2. Mehrfach benoetigte Inventar-Zutaten extra "
+                    "3. Extra-Vorschlaege fuer konkrete Rezepte "
+                    "4. Budget einhalten 5. REWE-Preise"
+                )}
             ]
         )
         text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()

@@ -1152,7 +1152,9 @@ function renderMealPlan(data) {
       const rezeptData = JSON.stringify(m).replace(/'/g,"&#39;").replace(/"/g,'&quot;');
       const cardIdx = planCardIndex++;
       const nw = m.naehrstoffe || {};
-      const nwHtml = (nw.kalorien || nw.protein) ? `<div style="display:flex;gap:8px;font-size:11px;color:var(--muted);margin-top:4px;flex-wrap:wrap">${nw.kalorien?`<span>🔥 ${nw.kalorien} kcal</span>`:''}${nw.protein?`<span>💪 ${nw.protein}g P</span>`:''}${nw.kohlenhydrate?`<span>🌾 ${nw.kohlenhydrate}g KH</span>`:''}${nw.fett?`<span>🥑 ${nw.fett}g F</span>`:''}</div>` : '';
+      const isMealPrepAbend = !isMealPrep && m.mahlzeit === 'Abendessen' && document.getElementById('meal-prep-toggle')?.checked;
+      const makroFaktor = isMealPrepAbend ? 0.5 : 1;
+      const nwHtml = (nw.kalorien || nw.protein) ? `<div style="display:flex;gap:8px;font-size:11px;color:var(--muted);margin-top:4px;flex-wrap:wrap">${nw.kalorien?`<span>🔥 ${Math.round(nw.kalorien*makroFaktor)} kcal</span>`:''}${nw.protein?`<span>💪 ${Math.round(nw.protein*makroFaktor)}g P</span>`:''}${nw.kohlenhydrate?`<span>🌾 ${Math.round(nw.kohlenhydrate*makroFaktor)}g KH</span>`:''}${nw.fett?`<span>🥑 ${Math.round(nw.fett*makroFaktor)}g F</span>`:''}${isMealPrepAbend?'<span style="color:#0369A1;font-size:10px">(pro Portion)</span>':''}</div>` : '';
       const mealPrepNote = isMealPrep
         ? `<div style="font-size:11px;color:#0369A1;margin-top:3px;background:#EFF6FF;padding:4px 8px;border-radius:6px">🍱 Vom gestrigen Abendessen – kein Kochen nötig. Mengen = 1 Portion.</div>`
         : '';
@@ -1187,7 +1189,24 @@ function renderMealPlan(data) {
       </div>`;
       planCards[cardIdx] = { ...m, tag: t };
     }
-    html += '</div>';
+    html += '</div>'; // close dropzone
+    // Tages-Makro-Summe
+    const tagsMahlzeiten = mahlzeiten.filter(m => m.quelle !== 'meal_prep');
+    const tagesKcal = tagsMahlzeiten.reduce((s, m) => {
+      const nw = m.naehrstoffe || {};
+      const f = (!isMealPrep && m.mahlzeit === 'Abendessen' && document.getElementById('meal-prep-toggle')?.checked) ? 0.5 : 1;
+      return s + Math.round((nw.kalorien || 0) * f);
+    }, 0);
+    const tagesProt = tagsMahlzeiten.reduce((s, m) => {
+      const nw = m.naehrstoffe || {};
+      const f = (!isMealPrep && m.mahlzeit === 'Abendessen' && document.getElementById('meal-prep-toggle')?.checked) ? 0.5 : 1;
+      return s + Math.round((nw.protein || 0) * f);
+    }, 0);
+    if (tagesKcal > 0) {
+      html += `<div style="font-size:11px;color:var(--muted);text-align:right;margin-bottom:6px;padding-right:4px" id="tages-makros-${t}">
+        Tagessumme: 🔥 ${tagesKcal} kcal · 💪 ${tagesProt}g P
+      </div>`;
+    }
   }
 
   if (extra_zutaten && extra_zutaten.length > 0) {
@@ -1649,7 +1668,7 @@ function planRezeptDirekt(id) {
   document.body.appendChild(modal);
 }
 
-function confirmPlanRezeptDirekt(rezeptId, btn) {
+async function confirmPlanRezeptDirekt(rezeptId, btn) {
   const r = meineRezepte.find(r => r.id === rezeptId);
   if (!r) return;
   const select = document.getElementById('slot-select');
@@ -1713,6 +1732,32 @@ function confirmPlanRezeptDirekt(rezeptId, btn) {
       </div>`;
   }
   updateEinkaufslisteNachAenderung();
+  // Preise für neue Zutaten schätzen
+  const invNamesSet = new Set(inventory.map(i => i.name.toLowerCase()));
+  const zuKaufen = (r.zutaten || []).filter(z => !invNamesSet.has(z.name.toLowerCase()));
+  let preisGesamt = 0;
+  for (const z of zuKaufen) {
+    try {
+      const pr = await fetch('/preis-schaetzen', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ name: z.name + ' ' + (z.menge||'') })
+      });
+      const pd = await pr.json();
+      preisGesamt += pd.preis || 0;
+    } catch(e) {}
+  }
+  // Budget-Warnung wenn nötig
+  const budget = parseFloat(document.getElementById('plan-budget')?.value) || 0;
+  if (budget > 0 && preisGesamt > 0) {
+    const budgetFrei = budget - (currentPlanData?.budget_verwendet || 0);
+    if (preisGesamt > budgetFrei) {
+      if (!confirm(`Dieses Rezept kostet ca. ${preisGesamt.toFixed(2)}€ an neuen Zutaten, aber dein verbleibendes Budget ist nur ${budgetFrei.toFixed(2)}€. Trotzdem einplanen?`)) {
+        btn.closest('div[style*=fixed]').remove();
+        return;
+      }
+    }
+  }
+  updateBudget();
   btn.closest('div[style*=fixed]').remove();
 }
 
@@ -1973,8 +2018,37 @@ async function regenMeal(idx) {
       }
     }
 
-    // Einkaufsliste updaten
+    // Einkaufsliste updaten + Preise schätzen
     updateEinkaufslisteNachAenderung();
+    // Neue kaufen:true Zutaten mit Preisen versehen
+    const neueZutaten = (newRezept.zutaten || []).filter(z => z.kaufen !== false);
+    for (const z of neueZutaten) {
+      try {
+        const pr = await fetch('/preis-schaetzen', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: z.name + ' ' + (z.menge || '') })
+        });
+        const pd = await pr.json();
+        if (pd.preis > 0) {
+          // Preis im einkaufPreise für dieses Item setzen
+          const wrapper = document.getElementById('einkaufsliste-wrapper');
+          if (wrapper) {
+            wrapper.querySelectorAll('.einkauf-name').forEach(el => {
+              if (el.textContent.toLowerCase() === z.name.toLowerCase()) {
+                const item = el.closest('.einkauf-item');
+                if (item) {
+                  const idx = parseInt(item.id.replace('einkauf-', ''));
+                  einkaufPreise[idx] = pd.preis;
+                  const preisEl = item.querySelector('.einkauf-preis');
+                  if (preisEl) preisEl.textContent = pd.preis.toFixed(2) + ' €';
+                }
+              }
+            });
+          }
+        }
+      } catch(e) {}
+    }
+    updateBudget();
   } catch(e) {
     if (titleEl) titleEl.textContent = origTitle;
     card.style.opacity = '1';
