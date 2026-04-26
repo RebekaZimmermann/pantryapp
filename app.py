@@ -721,6 +721,7 @@ def mealplan():
                 None
             )
             if prev_abendessen:
+                # Makros der Meal Prep Kopie = gleich wie Abendessen (beide bereits pro Portion)
                 plan.append({
                     **prev_abendessen,
                     'tag': tag,
@@ -949,6 +950,18 @@ Snack für Tag {tag}. Einfach, gesund, mit Obst wenn möglich."""}
             rezept['mahlzeit'] = mahlzeit_label
             rezept['quelle'] = 'ki'
             rezept['phase'] = 2 if phase2 else 1
+
+            # Meal Prep: Makros auf "pro Portion" normieren (KI gibt 2 Portionen an)
+            if meal_prep and mahlzeit_label == 'Abendessen':
+                nw = rezept.get('naehrstoffe', {})
+                if nw and any(nw.get(k) for k in ['kalorien', 'protein', 'kohlenhydrate', 'fett']):
+                    rezept['naehrstoffe'] = {
+                        'kalorien': round((nw.get('kalorien') or 0) / 2),
+                        'protein': round((nw.get('protein') or 0) / 2),
+                        'kohlenhydrate': round((nw.get('kohlenhydrate') or 0) / 2),
+                        'fett': round((nw.get('fett') or 0) / 2),
+                    }
+
             plan.append(rezept)
 
             for zutat in rezept.get('zutaten', []):

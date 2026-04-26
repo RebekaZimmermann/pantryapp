@@ -1158,8 +1158,7 @@ function renderMealPlan(data) {
       const cardIdx = planCardIndex++;
       const nw = m.naehrstoffe || {};
       const isMealPrepAbend = !isMealPrep && m.mahlzeit === 'Abendessen' && document.getElementById('meal-prep-toggle')?.checked;
-      const makroFaktor = isMealPrepAbend ? 0.5 : 1;
-      const nwHtml = (nw.kalorien || nw.protein) ? `<div style="display:flex;gap:8px;font-size:11px;color:var(--muted);margin-top:4px;flex-wrap:wrap">${nw.kalorien?`<span>🔥 ${Math.round(nw.kalorien*makroFaktor)} kcal</span>`:''}${nw.protein?`<span>💪 ${Math.round(nw.protein*makroFaktor)}g P</span>`:''}${nw.kohlenhydrate?`<span>🌾 ${Math.round(nw.kohlenhydrate*makroFaktor)}g KH</span>`:''}${nw.fett?`<span>🥑 ${Math.round(nw.fett*makroFaktor)}g F</span>`:''}${isMealPrepAbend?'<span style="color:#0369A1;font-size:10px">(pro Portion)</span>':''}</div>` : '';
+      const nwHtml = (nw.kalorien || nw.protein) ? `<div style="display:flex;gap:8px;font-size:11px;color:var(--muted);margin-top:4px;flex-wrap:wrap">${nw.kalorien?`<span>🔥 ${nw.kalorien} kcal</span>`:''}${nw.protein?`<span>💪 ${nw.protein}g P</span>`:''}${nw.kohlenhydrate?`<span>🌾 ${nw.kohlenhydrate}g KH</span>`:''}${nw.fett?`<span>🥑 ${nw.fett}g F</span>`:''}${isMealPrepAbend?'<span style="color:#0369A1;font-size:10px">(pro Portion)</span>':''}</div>` : '';
       const mealPrepNote = isMealPrep
         ? `<div style="font-size:11px;color:#0369A1;margin-top:3px;background:#EFF6FF;padding:4px 8px;border-radius:6px">🍱 Vom gestrigen Abendessen – kein Kochen nötig. Mengen = 1 Portion.</div>`
         : '';
@@ -1274,7 +1273,7 @@ let einkaufPreise = {};
 function renderEinkaufItem(idx, name, menge, preis, typ) {
   const preisVal = preis ? parseFloat(preis) : 0;
   einkaufPreise[idx] = preisVal;
-  return `<div class="einkauf-item" id="einkauf-${idx}" data-preis="${preisVal}">
+  return `<div class="einkauf-item" id="einkauf-${idx}" data-preis="${preisVal}" data-typ="${typ}" data-name="${name.toLowerCase()}">
     <div class="checkbox" id="cb-${idx}" onclick="toggleCheck(${idx})"></div>
     <div class="einkauf-name" style="margin-left:8px">${name}</div>
     <div class="einkauf-menge">${menge || ''}</div>
@@ -1863,8 +1862,8 @@ function updateEinkaufslisteNachAenderung() {
   const wrapper = document.getElementById('einkaufsliste-wrapper');
   if (!wrapper) return;
 
-  // Welche Zutaten braucht der aktuelle Plan (kaufen:true)
-  const needed = {}; // name.lower -> {name, menge, kaufen}
+  // Alle Zutaten die der aktuelle Plan benötigt (kaufen:true, nicht im Inventar)
+  const needed = {}; // name.lower -> zutat
   Object.values(planCards).forEach(m => {
     (m.zutaten || []).forEach(z => {
       if (z.kaufen !== false && !invNames.has(z.name.toLowerCase())) {
@@ -1873,23 +1872,19 @@ function updateEinkaufslisteNachAenderung() {
     });
   });
 
-  // Vorhandene fehlend-Items prüfen – entfernen wenn nicht mehr gebraucht
-  wrapper.querySelectorAll('.einkauf-item').forEach(item => {
-    const nameEl = item.querySelector('.einkauf-name');
-    const typEl = item.querySelector('[class^="einkauf-typ-"]');
-    if (!nameEl || !typEl || !typEl.className.includes('fehlend')) return;
-    const name = nameEl.textContent.toLowerCase();
+  // Items mit data-typ="fehlend" prüfen – entfernen wenn nicht mehr gebraucht
+  wrapper.querySelectorAll('.einkauf-item[data-typ="fehlend"]').forEach(item => {
+    const name = item.dataset.name || item.querySelector('.einkauf-name')?.textContent?.toLowerCase() || '';
     if (!needed[name]) {
       delete einkaufPreise[parseInt(item.id.replace('einkauf-', ''))];
       item.remove();
     } else {
-      delete needed[name]; // bereits vorhanden
+      delete needed[name]; // bereits in Liste vorhanden
     }
   });
 
   // Neue fehlende Zutaten hinzufügen
   for (const z of Object.values(needed)) {
-    const kategorie = 'Neu';
     let targetKat = wrapper.querySelector('[data-kategorie="Neu"]');
     if (!targetKat) {
       targetKat = document.createElement('div');
