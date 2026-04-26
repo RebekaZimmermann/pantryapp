@@ -903,8 +903,27 @@ Snack für Tag {tag}. Einfach, gesund, mit Obst wenn möglich."""}
                     ]
                 )
 
-            text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
-            rezept = json.loads(text)
+            text = response.choices[0].message.content.strip()
+            # Bereinigen: Markdown Backticks, führende/trailing Whitespace
+            text = text.replace('```json', '').replace('```', '').strip()
+            # Falls die KI Text vor dem JSON schreibt, JSON-Block extrahieren
+            if not text.startswith('{'):
+                import re as re2
+                json_match = re2.search(r'\{.*\}', text, re2.DOTALL)
+                if json_match:
+                    text = json_match.group(0)
+            try:
+                rezept = json.loads(text)
+            except json.JSONDecodeError as je:
+                print(f"JSON Parse Error: {je}\nText: {text[:200]}")
+                # Fallback: einfaches Rezept generieren
+                rezept = {
+                    'titel': 'Einfaches Gericht',
+                    'beschreibung': 'Konnte nicht generiert werden',
+                    'zutaten': [],
+                    'zubereitung': '',
+                    'naehrstoffe': {}
+                }
 
             # Post-Processing: unrealistische Mengen korrigieren
             for z in rezept.get('zutaten', []):
@@ -974,7 +993,14 @@ Snack für Tag {tag}. Einfach, gesund, mit Obst wenn möglich."""}
                     ]
                 )
                 text = response.choices[0].message.content.replace('```json','').replace('```','').strip()
-                snack = json.loads(text)
+                if not text.startswith('{'):
+                    import re as re3
+                    jm = re3.search(r'\{.*\}', text, re3.DOTALL)
+                    if jm: text = jm.group(0)
+                try:
+                    snack = json.loads(text)
+                except json.JSONDecodeError:
+                    snack = {'titel': 'Snack', 'beschreibung': '', 'zutaten': [], 'zubereitung': '', 'naehrstoffe': {}}
                 # kaufen-Flag nachkorrigieren basierend auf Inventar
                 for z in snack.get('zutaten', []):
                     if z['name'].lower() in inv_names_lower:
@@ -1076,7 +1102,14 @@ Snack für Tag {tag}. Einfach, gesund, mit Obst wenn möglich."""}
             ]
         )
         text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
-        einkauf_data = json.loads(text)
+        if not text.startswith('{'):
+            import re as re4
+            jm = re4.search(r'\{.*\}', text, re4.DOTALL)
+            if jm: text = jm.group(0)
+        try:
+            einkauf_data = json.loads(text)
+        except json.JSONDecodeError:
+            einkauf_data = {}
         einkaufsliste = einkauf_data.get('einkaufsliste', {})
         extra_zutaten = einkauf_data.get('extra_zutaten', [])
         budget_verwendet = einkauf_data.get('budget_verwendet', 0)
