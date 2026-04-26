@@ -1028,69 +1028,79 @@ Snack für Tag {tag}. Einfach, gesund, mit Obst wenn möglich."""}
             except Exception as e:
                 plan.append({'tag': tag, 'mahlzeit': 'Snack', 'titel': 'Snack', 'beschreibung': str(e), 'zutaten': [], 'zubereitung': '', 'quelle': 'ki', 'phase': 2})
 
-    # Einkaufsliste & Extra-Zutaten
-    # Meal Prep Kopien ausschließen - sie kochen dieselbe Portion wie das Abendessen
+    # Einkaufsliste: serverseitig berechnen, KI nur für Preise und Extras
     plan_ohne_meal_prep = [m for m in plan if m.get('quelle') != 'meal_prep']
 
-    # Inventar-Zutaten die im Plan mehr gebraucht werden als vorhanden
-    inventar_bedarf = {}
+    import re as re_m
+
+    def parse_g(s):
+        """Zahl aus Mengenstring extrahieren (in Gramm/Stück normiert)."""
+        if not s: return None
+        s = s.lower().strip()
+        m = re_m.search(r'([\d.,]+)\s*kg', s)
+        if m: return float(m.group(1).replace(',','.')) * 1000
+        m = re_m.search(r'([\d.,]+)\s*g\b', s)
+        if m: return float(m.group(1).replace(',','.'))
+        m = re_m.search(r'([\d.,]+)\s*ml', s)
+        if m: return float(m.group(1).replace(',','.'))
+        m = re_m.search(r'([\d.,]+)\s*l\b', s)
+        if m: return float(m.group(1).replace(',','.')) * 1000
+        m = re_m.search(r'([\d.,]+)\s*st[üu]ck', s)
+        if m: return float(m.group(1).replace(',','.'))
+        m = re_m.search(r'^([\d.,]+)$', s.strip())
+        if m: return float(m.group(1).replace(',','.'))
+        return None
+
+    # Bedarf pro Zutat summieren
+    bedarf = {}  # name.lower -> {name, kaufen_immer, gramm_gesamt, mengen[]}
     for m in plan_ohne_meal_prep:
         for z in m.get('zutaten', []):
-            if not z.get('kaufen', False):
-                zn = z['name'].lower()
-                if zn not in inventar_bedarf:
-                    inventar_bedarf[zn] = []
-                inventar_bedarf[zn].append(z.get('menge', ''))
+            zn = z['name'].lower()
+            if zn not in bedarf:
+                bedarf[zn] = {'name': z['name'], 'kaufen_immer': z.get('kaufen', False), 'gramm': 0, 'mengen': []}
+            bedarf[zn]['mengen'].append(z.get('menge', ''))
+            g = parse_g(z.get('menge', ''))
+            if g: bedarf[zn]['gramm'] += g
+            if z.get('kaufen', False): bedarf[zn]['kaufen_immer'] = True
 
-    mehrfach_benoetigt = []
-    for zn, mengen in inventar_bedarf.items():
-        if len(mengen) > 1:
-            inv_match = next((i for i in items if i.name.lower() == zn), None)
-            if inv_match:
-                mehrfach_benoetigt.append(
-                    f"{inv_match.name}: im Inventar {inv_match.menge}, "
-                    f"benötigt in {len(mengen)} Rezepten: {', '.join(mengen)} -> "
-                    f"falls Gesamtmenge das Inventar übersteigt, fehlende Menge auf Einkaufsliste"
-                )
+    # Inventar-Map
+    inv_map = {i.name.lower(): {'menge': i.menge, 'gramm': parse_g(i.menge)} for i in items}
 
-    all_items_text = ', '.join([f"{i.menge} {i.name}" for i in items])
-    # Nur plan_ohne_meal_prep für Einkaufsliste verwenden
-    plan_zutaten_text = '\n'.join([
-        f"- {m['titel']} (Tag {m['tag']}, {m['mahlzeit']}): {', '.join([z['name'] + ' (' + z.get('menge','') + ')' for z in m.get('zutaten',[])])}"
-        for m in plan_ohne_meal_prep
-    ])
-    fehlende_namen = ', '.join(set([
-        z['name'] for m in plan_ohne_meal_prep
-        for z in m.get('zutaten', [])
-        if z['name'].lower() not in [i.name.lower() for i in items]
-    ]))
-    mehrfach_text = ('Mehrfach benötigte Inventar-Zutaten (extra Menge kaufen): ' + '; '.join(mehrfach_benoetigt)) if mehrfach_benoetigt else ''
-    budget_text = f"Budget für Einkauf: {budget:.2f} EUR" if budget > 0 else "Kein Budget festgelegt"
+    # Was muss wirklich gekauft werden?
+    muss_kaufen = []  # [{name, menge_rezept, fehlend_gramm}]
+    for zn, info in bedarf.items():
+        if info['kaufen_immer']:
+            muss_kaufen.append({'name': info['name'], 'mengen': info['mengen'], 'fehlend': info['gramm']})
+            continue
+        inv = inv_map.get(zn)
+        if not inv:
+            # Nicht im Inventar
+            muss_kaufen.append({'name': info['name'], 'mengen': info['mengen'], 'fehlend': info['gramm']})
+        elif inv['gramm'] is not None and info['gramm'] > 0:
+            if info['gramm'] > inv['gramm'] * 1.05:  # 5% Toleranz
+                fehlend = info['gramm'] - inv['gramm']
+                muss_kaufen.append({'name': info['name'], 'mengen': info['mengen'], 'fehlend': fehlend})
+            # else: ausreichend vorhanden
+        # else: Mengen nicht parsierbar -> kaufen_immer Flag entscheidet
+
+    # KI nur für Preise und Extra-Zutaten
+    fehlend_fuer_ki = '\n'.join([
+        f"- {f['name']} (benoetigt: {', '.join(f['mengen'])})"
+        for f in muss_kaufen
+    ]) or 'Keine'
+
+    budget_text = f"Budget: {budget:.2f} EUR" if budget > 0 else "Kein Budget"
 
     einkauf_system_prompt = (
-        "Du bist Einkaufsplaner fuer Deutschland (REWE). Antworte NUR mit validem JSON.\n"
-        "REGELN:\n"
-        "- einkaufsliste: NUR Zutaten die im Plan benoetigt aber NICHT im Inventar sind (typ: fehlend)\n"
-        "- KRITISCH: Menge = kleinste handelsübliche Verpackungseinheit:\n"
-        "  Eier: 6 Stueck (1 Packung), niemals 1 oder 2 Stueck\n"
-        "  Milch: 1 Liter, niemals 200ml\n"
-        "  Mehl/Nudeln/Reis/Linsen: 500g-1kg Packung, niemals 80g oder 100g\n"
-        "  Joghurt: 500g Becher, niemals 150g\n"
-        "  Kaese: 150-200g Packung, niemals 30g\n"
-        "  Tomaten (Dose): 400g Dose\n"
-        "  Gemuese: reale Stueckzahl (1 Bund Moehren, 1 Stueck Brokkoli)\n"
-        "  Fleisch/Fisch: 1 Packung ca. 400g\n"
-        "- Preis = Preis fuer die gesamte Verpackung\n"
-        "- extra_zutaten: optionale Zutaten die ein KONKRETES Rezept aufwerten - rezept Feld pflicht\n"
-        "- Grundzutaten Wasser/Salz/Pfeffer/Oel/Zucker NIEMALS vorschlagen\n"
-        "- Korrekte deutsche Umlaute, realistische REWE-Preise\n"
-        "- Fuer extra_zutaten: naehrstoffe_zusatz als Text z.B. +8g Protein +120 kcal\n"
-        'Format: {"extra_zutaten":[{"name":"Parmesan","menge":"100g Stueck","preis_ca":2.49,'
-        '"grund":"Macht Pasta cremiger","rezept":"Pasta","kategorie":"Kuehlregal",'
-        '"naehrstoffe_zusatz":"+8g Protein"}],'
-        '"einkaufsliste":{"Obst & Gemuese":[{"name":"Eier","menge":"6 Stueck (1 Packung)",'
-        '"preis_ca":1.99,"typ":"fehlend"}],"Kuehlregal":[],"Tiefkuehl":[],'
-        '"Brot & Backwaren":[],"Trockenwaren":[],"Getraenke":[],"Sonstiges":[]},'
+        "Du bist Preisschaetzer fuer Deutschland (REWE). Antworte NUR mit validem JSON.\n"
+        "Du bekommst eine Liste von Zutaten die eingekauft werden MUESSEN.\n"
+        "Deine Aufgaben:\n"
+        "1. Fuer jede Zutat: realistische REWE-Packungsgroesse und Preis angeben\n"
+        "2. Kategorie zuordnen: Obst & Gemuese, Kuehlregal, Tiefkuehl, Brot & Backwaren, Trockenwaren, Getraenke, Sonstiges\n"
+        "3. 2-3 optionale Extra-Zutaten vorschlagen die konkrete Rezepte aufwerten\n"
+        "Packungsgroessen: Eier=6er Packung, Milch=1L, Mehl/Nudeln=500g, Joghurt=500g, Kaese=150-200g, Fleisch=400g\n"
+        'Format: {"einkaufsliste":{"Kuehlregal":[{"name":"Eier","menge":"6 Stueck (1 Packung)","preis_ca":1.99,"typ":"fehlend"}]},'
+        '"extra_zutaten":[{"name":"Parmesan","menge":"100g","preis_ca":2.49,"grund":"Aufwertung","rezept":"Pasta","kategorie":"Kuehlregal","naehrstoffe_zusatz":"+8g Protein"}],'
         '"budget_verwendet":5.00,"budget_gesamt":20.00}'
     )
 
@@ -1100,18 +1110,14 @@ Snack für Tag {tag}. Einfach, gesund, mit Obst wenn möglich."""}
 
     try:
         response = client.chat.completions.create(
-            model='gpt-4o', max_tokens=1500,
+            model='gpt-4o', max_tokens=1200,
             messages=[
                 {"role": "system", "content": einkauf_system_prompt},
                 {"role": "user", "content": (
-                    f"Inventar (vorhanden, NICHT auf Liste): {all_items_text}\n\n"
-                    f"Geplante Mahlzeiten:\n{plan_zutaten_text}\n\n"
-                    f"Fehlende Zutaten: {fehlende_namen}\n"
-                    f"{mehrfach_text}\n{budget_text}\n\n"
-                    "Aufgaben: 1. Nur fehlende Zutaten auf Liste "
-                    "2. Mehrfach benoetigte Inventar-Zutaten extra "
-                    "3. Extra-Vorschlaege fuer konkrete Rezepte "
-                    "4. Budget einhalten 5. REWE-Preise"
+                    f"Folgende Zutaten MUESSEN gekauft werden:\n{fehlend_fuer_ki}\n\n"
+                    f"Geplante Rezepte: {', '.join(set(m['titel'] for m in plan_ohne_meal_prep))}\n"
+                    f"{budget_text}\n"
+                    "Bitte Packungsgroesse und REWE-Preis fuer jede Zutat angeben."
                 )}
             ]
         )
