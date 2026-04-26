@@ -1234,12 +1234,14 @@ function renderMealPlan(data) {
     });
   }
 
-  if (budget > 0) {
-    html += `<div class="section-label" style="margin-top:20px">💰 Budget</div>
+  const hatEinkaufsItems = Object.values(einkaufsliste||{}).some(v => v && v.length > 0);
+  if (hatEinkaufsItems) {
+    html += `<div class="section-label" style="margin-top:20px">💰 Einkauf</div>
     <div class="budget-bar" id="budget-bar">
-      <div class="budget-row"><span>Geplante Ausgaben</span><span class="budget-total" id="budget-total">wird berechnet...</span></div>
+      <div class="budget-row"><span>Geschätzte Kosten</span><span class="budget-total" id="budget-total">wird berechnet...</span></div>
       <div class="budget-progress"><div class="budget-fill" id="budget-fill" style="width:0%"></div></div>
-      <div id="budget-over" style="font-size:11px;color:var(--orange);margin-top:4px;display:none">Budget überschritten</div>
+      ${budget > 0 ? `<div class="budget-row" style="font-size:11px;color:var(--muted)"><span>Budget</span><span>${budget.toFixed(2)} €</span></div>` : ''}
+      <div id="budget-over" style="font-size:11px;color:var(--orange);margin-top:4px;display:none">${budget > 0 ? 'Budget überschritten' : ''}</div>
     </div>`;
   }
 
@@ -1301,22 +1303,26 @@ function removeEinkaufItem(idx) {
 
 function updateBudget() {
   const budgetInput = parseFloat(document.getElementById('plan-budget')?.value) || 0;
-  if (budgetInput <= 0) return;
   const items = document.querySelectorAll('.einkauf-item');
   let total = 0;
-  items.forEach(item => {
-    const preis = parseFloat(item.dataset.preis) || 0;
-    total += preis;
-  });
-  const pct = Math.min((total / budgetInput) * 100, 100);
-  const over = total > budgetInput;
+  items.forEach(item => { total += parseFloat(item.dataset.preis) || 0; });
   const totalEl = document.getElementById('budget-total');
   const fillEl = document.getElementById('budget-fill');
   const overEl = document.getElementById('budget-over');
-  if (totalEl) totalEl.textContent = total.toFixed(2) + ' € / ' + budgetInput.toFixed(2) + ' €';
-  if (totalEl) totalEl.style.color = over ? 'var(--orange)' : 'var(--green)';
-  if (fillEl) { fillEl.style.width = pct + '%'; fillEl.className = 'budget-fill' + (over ? ' over' : ''); }
-  if (overEl) overEl.style.display = over ? 'block' : 'none';
+  if (!totalEl) return;
+  if (budgetInput > 0) {
+    const pct = Math.min((total / budgetInput) * 100, 100);
+    const over = total > budgetInput;
+    totalEl.textContent = total.toFixed(2) + ' € / ' + budgetInput.toFixed(2) + ' €';
+    totalEl.style.color = over ? 'var(--orange)' : 'var(--green)';
+    if (fillEl) { fillEl.style.width = pct + '%'; fillEl.className = 'budget-fill' + (over ? ' over' : ''); }
+    if (overEl) overEl.style.display = over ? 'block' : 'none';
+  } else {
+    totalEl.textContent = total.toFixed(2) + ' €';
+    totalEl.style.color = 'var(--text)';
+    if (fillEl) fillEl.style.width = '0%';
+    if (overEl) overEl.style.display = 'none';
+  }
 }
 
 function addExtraToEinkaufsliste(name, menge, kategorie, preis, btnIdx) {

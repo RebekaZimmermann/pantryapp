@@ -1083,7 +1083,12 @@ Snack für Tag {tag}. Einfach, gesund, mit Obst wenn möglich."""}
             # else: ausreichend vorhanden
         # else: Mengen nicht parsierbar -> kaufen_immer Flag entscheidet
 
-    # KI nur für Preise und Extra-Zutaten
+    # Grundzutaten die man immer zuhause hat – nie kaufen
+    grundzutaten = {'salz', 'pfeffer', 'öl', 'oel', 'olivenöl', 'olivenoel', 'zucker', 'wasser',
+                    'butter', 'mehl', 'backpulver', 'natron', 'essig', 'senf', 'ketchup',
+                    'speiseöl', 'sonnenblumenöl', 'rapsöl', 'pflanzenöl'}
+    muss_kaufen = [f for f in muss_kaufen
+                   if not any(g in f['name'].lower() for g in grundzutaten)]
     fehlend_fuer_ki = '\n'.join([
         f"- {f['name']} (benoetigt: {', '.join(f['mengen'])})"
         for f in muss_kaufen
