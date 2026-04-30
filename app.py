@@ -1136,7 +1136,13 @@ Snack für Tag {tag}. Einfach, gesund, mit Obst wenn möglich."""}
         except json.JSONDecodeError:
             einkauf_data = {}
         einkaufsliste = einkauf_data.get('einkaufsliste', {})
-        extra_zutaten = einkauf_data.get('extra_zutaten', [])
+        raw_extra = einkauf_data.get('extra_zutaten', [])
+        # Extra-Zutaten filtern: nichts vorschlagen was bereits im Inventar ist
+        inv_namen = {i.name.lower() for i in items}
+        extra_zutaten = [
+            e for e in raw_extra
+            if e.get('name', '').lower() not in inv_namen
+        ]
         budget_verwendet = einkauf_data.get('budget_verwendet', 0)
     except Exception as e:
         pass

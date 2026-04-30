@@ -529,16 +529,41 @@ let planCardIndex = 0;
 let planCards = {};
 let dragSrcIdx = null;
 let currentPlanData = null;
-let preisCache = {}; // name.lower -> preis (persistiert über regen)
+let preisCache = {};
+
+function savePlanToStorage() {
+  try {
+    if (currentPlanData) {
+      // planCards in currentPlanData einbauen
+      const grouped = {};
+      Object.values(planCards).forEach(m => {
+        const t = m.tag;
+        if (!grouped[t]) grouped[t] = [];
+        grouped[t].push(m);
+      });
+      const updated = { ...currentPlanData, plan: grouped };
+      localStorage.setItem('kuehlschrank_plan', JSON.stringify(updated));
+      localStorage.setItem('kuehlschrank_preisCache', JSON.stringify(preisCache));
+    }
+  } catch(e) {}
+}
 
 async function init() {
   await loadInventar();
   await loadMeineRezepte();
   await loadErnaehrung();
-  // Heutiges Datum als Standard setzen
   const today = new Date().toISOString().split('T')[0];
   const datumEl = document.getElementById('plan-startdatum');
   if (datumEl) datumEl.value = today;
+  // Gespeicherten Plan wiederherstellen
+  try {
+    const saved = localStorage.getItem('kuehlschrank_plan');
+    if (saved) {
+      const data = JSON.parse(saved);
+      preisCache = JSON.parse(localStorage.getItem('kuehlschrank_preisCache') || '{}');
+      renderMealPlan(data);
+    }
+  } catch(e) {}
 }
 
 // --- Inventar ---
@@ -1095,6 +1120,7 @@ async function generateMealPlan() {
     }
     const data = await res.json();
     if (data.error) throw new Error(data.error);
+    localStorage.setItem('kuehlschrank_plan', JSON.stringify(data));
     renderMealPlan(data);
   } catch(e) {
     container.innerHTML = `<div class="empty-state"><div class="emoji">😕</div><p>Fehler: ${e.message}</p></div>`;
@@ -1853,6 +1879,20 @@ function swapCards(idxA, idxB) {
   cardB.dataset.tag = tagA;
 }
 
+function aktualisierPreisImDOM(nameLower, preis) {
+  const wrapper = document.getElementById('einkaufsliste-wrapper');
+  if (!wrapper) return;
+  wrapper.querySelectorAll('.einkauf-item').forEach(item => {
+    if (item.dataset.name === nameLower) {
+      item.dataset.preis = preis;
+      const preisEl = item.querySelector('.einkauf-preis');
+      if (preisEl) preisEl.textContent = preis.toFixed(2) + ' €';
+      const idx = parseInt(item.id.replace('einkauf-', ''));
+      einkaufPreise[idx] = preis;
+    }
+  });
+}
+
 function deleteMeal(idx) {
   const card = document.getElementById('card-' + idx);
   if (card) { card.style.opacity = '0'; card.style.transition = 'opacity 0.2s'; setTimeout(() => card.remove(), 200); }
@@ -1862,7 +1902,7 @@ function deleteMeal(idx) {
 function deleteMealAndUpdateList(idx) {
   const m = planCards[idx];
   deleteMeal(idx);
-  if (m) updateEinkaufslisteNachAenderung();
+  if (m) { updateEinkaufslisteNachAenderung(); savePlanToStorage(); }
 }
 
 function updateEinkaufslisteNachAenderung() {
@@ -1909,8 +1949,9 @@ function updateEinkaufslisteNachAenderung() {
       wrapper.prepend(kat);
     }
     const idx = einkaufItemCount++;
-    if (z.preis) preisCache[z.name.toLowerCase()] = z.preis;
-    kat.insertAdjacentHTML('beforeend', renderEinkaufItem(idx, z.name, z.menge, z.preis, 'fehlend'));
+    const cachedPreis = preisCache[z.name.toLowerCase()] || 0;
+    if (cachedPreis) einkaufPreise[idx] = cachedPreis;
+    kat.insertAdjacentHTML('beforeend', renderEinkaufItem(idx, z.name, z.menge, cachedPreis, 'fehlend'));
   }
 
   // Leere Kategorien entfernen
@@ -2035,37 +2076,32 @@ async function regenMeal(idx) {
       }
     }
 
-    // Einkaufsliste updaten + Preise schätzen
+    // Einkaufsliste updaten
     updateEinkaufslisteNachAenderung();
-    // Neue kaufen:true Zutaten mit Preisen versehen
-    const neueZutaten = (newRezept.zutaten || []).filter(z => z.kaufen !== false);
+
+    // Preise für neue Zutaten schätzen und in Cache + DOM eintragen
+    const neueZutaten = (newRezept.zutaten || []).filter(z => z.kaufen === true);
     for (const z of neueZutaten) {
-      try {
-        const pr = await fetch('/preis-schaetzen', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: z.name + ' ' + (z.menge || '') })
-        });
-        const pd = await pr.json();
-        if (pd.preis > 0) {
-          // Preis im einkaufPreise für dieses Item setzen
-          const wrapper = document.getElementById('einkaufsliste-wrapper');
-          if (wrapper) {
-            wrapper.querySelectorAll('.einkauf-name').forEach(el => {
-              if (el.textContent.toLowerCase() === z.name.toLowerCase()) {
-                const item = el.closest('.einkauf-item');
-                if (item) {
-                  const idx = parseInt(item.id.replace('einkauf-', ''));
-                  einkaufPreise[idx] = pd.preis;
-                  const preisEl = item.querySelector('.einkauf-preis');
-                  if (preisEl) preisEl.textContent = pd.preis.toFixed(2) + ' €';
-                }
-              }
-            });
+      const zn = z.name.toLowerCase();
+      if (preisCache[zn]) {
+        // Bereits im Cache – DOM aktualisieren
+        aktualisierPreisImDOM(zn, preisCache[zn]);
+      } else {
+        try {
+          const pr = await fetch('/preis-schaetzen', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: z.name + ' ' + (z.menge || '') })
+          });
+          const pd = await pr.json();
+          if (pd.preis > 0) {
+            preisCache[zn] = pd.preis;
+            aktualisierPreisImDOM(zn, pd.preis);
           }
-        }
-      } catch(e) {}
+        } catch(e) {}
+      }
     }
     updateBudget();
+    savePlanToStorage();
   } catch(e) {
     if (titleEl) titleEl.textContent = origTitle;
     card.style.opacity = '1';
